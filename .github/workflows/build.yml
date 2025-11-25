@@ -1,0 +1,125 @@
+name: Build
+
+on:
+  push:
+    branches: main
+  pull_request:
+    branches: '*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Base Setup
+      uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+
+    - name: Install dependencies
+      run: python -m pip install -U "jupyterlab>=4.0.0,<5"
+
+    - name: Build the extension
+      run: |
+        set -eux
+        jlpm
+        jlpm run build
+
+    - name: Install and verify extension
+      run: |
+        set -eux
+        python -m pip install .[test]
+
+        jupyter server extension list
+        jupyter server extension list 2>&1 | grep -ie "nb_uv_kernels.*OK"
+
+        jupyter labextension list
+        jupyter labextension list 2>&1 | grep -ie "nb_uv_kernels.*OK"
+
+    - name: Run Python tests
+      run: |
+        set -eux
+        pytest -vv -r ap --cov nb_uv_kernels nb_uv_kernels/tests/
+
+    - name: Test CLI
+      run: |
+        set -eux
+        # Test CLI commands
+        nb_uv_kernels list
+
+        # Create test venv and register
+        python -m venv /tmp/test-venv
+        /tmp/test-venv/bin/pip install ipykernel
+        nb_uv_kernels register /tmp/test-venv
+        nb_uv_kernels list | grep -i test-venv
+
+        # Verify kernel discovery
+        python -c "
+        from nb_uv_kernels.manager import UvKernelSpecManager
+        m = UvKernelSpecManager()
+        specs = m.find_kernel_specs()
+        print('Found kernels:', list(specs.keys()))
+        assert any('test-venv' in k for k in specs.keys()), 'test-venv kernel not found'
+        "
+
+        # Unregister
+        nb_uv_kernels unregister /tmp/test-venv
+        nb_uv_kernels list | grep -v test-venv || true
+
+    - name: Package the extension
+      run: |
+        set -eux
+        pip install build
+        python -m build
+        pip uninstall -y "nb_uv_kernels" jupyterlab
+
+    - name: Upload extension packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: extension-artifacts
+        path: dist/nb_uv_kernels*
+        if-no-files-found: error
+
+  test_isolated:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+        architecture: 'x64'
+
+    - uses: actions/download-artifact@v4
+      with:
+        name: extension-artifacts
+
+    - name: Install and Test
+      run: |
+        set -eux
+        # Remove NodeJS
+        sudo rm -rf $(which node) || true
+        sudo rm -rf $(which node) || true
+
+        pip install "jupyterlab>=4.0.0,<5" nb_uv_kernels*.whl
+
+        jupyter server extension list
+        jupyter server extension list 2>&1 | grep -ie "nb_uv_kernels.*OK"
+
+        # Test kernel discovery works
+        nb_uv_kernels list
+
+  check_links:
+    name: Check Links
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+      - uses: jupyterlab/maintainer-tools/.github/actions/check-links@v1
