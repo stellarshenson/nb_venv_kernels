@@ -47,7 +47,15 @@ def exec_in_env(env_path, *command):
             os.execvp(command[0], command)
         else:
             activate = os.path.join(env_path, "bin", "activate")
-            ecomm = ". '{}' && exec {}".format(activate, " ".join(quoted_command))
+            # Deactivate conda first if active, then activate venv
+            deactivate_conda = (
+                "unset CONDA_PREFIX CONDA_DEFAULT_ENV CONDA_PROMPT_MODIFIER "
+                "CONDA_SHLVL CONDA_PYTHON_EXE CONDA_EXE; "
+                "export PATH=$(echo $PATH | sed -e 's|[^:]*conda[^:]*:||g'); "
+            )
+            ecomm = "{} . '{}' && exec {}".format(
+                deactivate_conda, activate, " ".join(quoted_command)
+            )
             shell = "sh" if "bsd" in sys.platform else "bash"
             os.execvp(shell, [shell, "-c", ecomm])
 

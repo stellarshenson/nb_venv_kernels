@@ -8,7 +8,7 @@ except ImportError:
     warnings.warn("Importing 'nb_venv_kernels' outside a proper installation.")
     __version__ = "dev"
 
-from .manager import UvKernelSpecManager
+from .manager import VEnvKernelSpecManager
 from .routes import setup_route_handlers
 
 
@@ -41,10 +41,10 @@ def _load_jupyter_server_extension(server_app):
     setup_route_handlers(server_app.web_app)
     log.debug(f"{name} | Route handlers registered")
 
-    # Configure KernelSpecManager to use UvKernelSpecManager
+    # Configure KernelSpecManager to use VEnvKernelSpecManager
     # Note: This may not take effect if kernel_spec_manager is already instantiated
-    server_app.kernel_spec_manager_class = UvKernelSpecManager
-    log.info(f"{name} | Set kernel_spec_manager_class to UvKernelSpecManager")
+    server_app.kernel_spec_manager_class = VEnvKernelSpecManager
+    log.info(f"{name} | Set kernel_spec_manager_class to VEnvKernelSpecManager")
 
     # Log registry status
     from .registry import get_registry_path, read_environments

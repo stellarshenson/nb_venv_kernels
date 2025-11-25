@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""CLI for nb_venv_kernels - register and manage uv/venv environments."""
+"""CLI for nb_venv_kernels - register and manage venv/uv environments."""
 import argparse
 import json
 import os
@@ -47,7 +47,7 @@ def find_jupyter_config_dir():
 
 
 def update_jupyter_config(config_dir=None):
-    """Update Jupyter config to use UvKernelSpecManager.
+    """Update Jupyter config to use VEnvKernelSpecManager.
 
     Args:
         config_dir: Optional config directory. Auto-detected if not provided.
@@ -59,7 +59,7 @@ def update_jupyter_config(config_dir=None):
         config_dir = find_jupyter_config_dir()
 
     config_path = os.path.join(config_dir, "jupyter_config.json")
-    manager_class = "nb_venv_kernels.UvKernelSpecManager"
+    manager_class = "nb_venv_kernels.VEnvKernelSpecManager"
 
     # Load existing config or start fresh
     config = {}
@@ -98,7 +98,7 @@ def update_jupyter_config(config_dir=None):
 
 
 def remove_jupyter_config(config_dir=None):
-    """Remove UvKernelSpecManager from Jupyter config.
+    """Remove VEnvKernelSpecManager from Jupyter config.
 
     Args:
         config_dir: Optional config directory. Auto-detected if not provided.
@@ -110,7 +110,7 @@ def remove_jupyter_config(config_dir=None):
         config_dir = find_jupyter_config_dir()
 
     config_path = os.path.join(config_dir, "jupyter_config.json")
-    manager_class = "nb_venv_kernels.UvKernelSpecManager"
+    manager_class = "nb_venv_kernels.VEnvKernelSpecManager"
 
     if not os.path.exists(config_path):
         return config_path, False, "Config file does not exist"
@@ -133,7 +133,7 @@ def remove_jupyter_config(config_dir=None):
                 del config[app]
 
     if not modified:
-        return config_path, False, "UvKernelSpecManager not configured"
+        return config_path, False, "VEnvKernelSpecManager not configured"
 
     # Write updated config
     with open(config_path, "w") as f:
@@ -154,8 +154,8 @@ Commands:
   register <path>     Register an environment for kernel discovery
   unregister <path>   Remove an environment from kernel discovery
   list                List all registered environments
-  config enable       Enable UvKernelSpecManager in Jupyter config
-  config disable      Disable UvKernelSpecManager in Jupyter config
+  config enable       Enable VEnvKernelSpecManager in Jupyter config
+  config disable      Disable VEnvKernelSpecManager in Jupyter config
   config show         Show current config location and status
 
 Examples:
@@ -214,7 +214,7 @@ def main():
     config_parser.add_argument(
         "action",
         choices=["enable", "disable", "show"],
-        help="enable/disable/show UvKernelSpecManager config",
+        help="enable/disable/show VEnvKernelSpecManager config",
     )
     config_parser.add_argument(
         "--path",

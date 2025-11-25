@@ -1,6 +1,6 @@
 # nb_venv_kernels
 
-Jupyter server extension that discovers kernels from uv and venv Python environments. Works standalone or alongside nb_conda_kernels for combined conda + venv kernel discovery.
+Composite Jupyter kernel spec manager that discovers kernels from conda, venv and uv Python environments. Combines functionality of nb_conda_kernels with venv/uv environment discovery.
 
 ## Install
 
@@ -9,7 +9,7 @@ pip install nb_venv_kernels
 nb_venv_kernels config enable
 ```
 
-The `config enable` command updates Jupyter configuration to use `UvKernelSpecManager`. This is required when nb_conda_kernels is installed, otherwise its manager takes precedence.
+The `config enable` command updates Jupyter configuration to use `VEnvKernelSpecManager`. This is required when nb_conda_kernels is installed, otherwise its manager takes precedence.
 
 ## Usage
 
@@ -24,8 +24,8 @@ nb_venv_kernels unregister /path/to/.venv
 Manage Jupyter configuration:
 
 ```bash
-nb_venv_kernels config enable     # Enable UvKernelSpecManager
-nb_venv_kernels config disable    # Disable UvKernelSpecManager
+nb_venv_kernels config enable     # Enable VEnvKernelSpecManager
+nb_venv_kernels config disable    # Disable VEnvKernelSpecManager
 nb_venv_kernels config show       # Show current config status
 ```
 
@@ -33,21 +33,23 @@ Registered environments with ipykernel appear in JupyterLab's kernel selector.
 
 ## How It Works
 
-- Reads registry from `~/.uv/environments.txt`
+- Reads venv registry from `~/.venv/environments.txt`
 - Scans `{path}/share/jupyter/kernels/*/kernel.json` for each registered environment
 - Wraps kernel argv with runner script that activates the venv before launch
 - Caches results for 60 seconds
-- Inherits from `CondaKernelSpecManager` if available, otherwise `KernelSpecManager`
+- Combines with `CondaKernelSpecManager` if available for unified conda + venv discovery
 
 ## Configuration
 
 Optional settings in `jupyter_server_config.py`:
 
 ```python
-c.UvKernelSpecManager.uv_only = True                    # Hide system kernels
-c.UvKernelSpecManager.env_filter = r"\.tox|\.nox"       # Exclude by pattern
-c.UvKernelSpecManager.name_format = "{language} ({environment})"
+c.VEnvKernelSpecManager.venv_only = True                      # Hide system/conda kernels
+c.VEnvKernelSpecManager.env_filter = r"\.tox|\.nox"           # Exclude by pattern
+c.VEnvKernelSpecManager.name_format = "{language} [{source}: {environment}]"  # Default format
 ```
+
+**Display name variables**: `{language}`, `{environment}`, `{source}` (uv/venv), `{kernel}`, `{display_name}`
 
 ## Uninstall
 

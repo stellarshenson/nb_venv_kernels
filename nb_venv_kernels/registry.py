@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Registry for uv/venv environments.
+"""Registry for venv environments.
 
-Manages ~/.uv/environments.txt - a simple text file listing registered
+Manages ~/.venv/environments.txt - a simple text file listing registered
 environment paths, one per line.
 """
 import os
@@ -11,11 +11,11 @@ from typing import List, Optional
 
 def get_registry_path() -> Path:
     """Return path to environments registry file."""
-    return Path.home() / ".uv" / "environments.txt"
+    return Path.home() / ".venv" / "environments.txt"
 
 
 def ensure_registry_dir() -> None:
-    """Create ~/.uv directory if it doesn't exist."""
+    """Create ~/.venv directory if it doesn't exist."""
     registry_path = get_registry_path()
     registry_path.parent.mkdir(parents=True, exist_ok=True)
 
