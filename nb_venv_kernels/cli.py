@@ -46,8 +46,15 @@ def find_jupyter_config_dir():
     return os.path.expanduser("~/.jupyter")
 
 
+def get_backup_path(config_path):
+    """Get backup file path for config."""
+    return config_path + ".nb_venv_kernels.bak"
+
+
 def update_jupyter_config(config_dir=None):
     """Update Jupyter config to use VEnvKernelSpecManager.
+
+    Backs up existing config before making changes.
 
     Args:
         config_dir: Optional config directory. Auto-detected if not provided.
@@ -59,6 +66,7 @@ def update_jupyter_config(config_dir=None):
         config_dir = find_jupyter_config_dir()
 
     config_path = os.path.join(config_dir, "jupyter_config.json")
+    backup_path = get_backup_path(config_path)
     manager_class = "nb_venv_kernels.VEnvKernelSpecManager"
 
     # Load existing config or start fresh
@@ -76,6 +84,14 @@ def update_jupyter_config(config_dir=None):
 
     if notebook_class == manager_class and server_class == manager_class:
         return config_path, False, "Already configured"
+
+    # Backup existing config before modifying (only if not already our config)
+    if os.path.exists(config_path) and notebook_class != manager_class:
+        try:
+            import shutil
+            shutil.copy2(config_path, backup_path)
+        except IOError:
+            pass  # Best effort backup
 
     # Update config
     if "NotebookApp" not in config:
@@ -100,6 +116,8 @@ def update_jupyter_config(config_dir=None):
 def remove_jupyter_config(config_dir=None):
     """Remove VEnvKernelSpecManager from Jupyter config.
 
+    Restores from backup if available, otherwise removes our settings.
+
     Args:
         config_dir: Optional config directory. Auto-detected if not provided.
 
@@ -110,6 +128,7 @@ def remove_jupyter_config(config_dir=None):
         config_dir = find_jupyter_config_dir()
 
     config_path = os.path.join(config_dir, "jupyter_config.json")
+    backup_path = get_backup_path(config_path)
     manager_class = "nb_venv_kernels.VEnvKernelSpecManager"
 
     if not os.path.exists(config_path):
@@ -121,9 +140,25 @@ def remove_jupyter_config(config_dir=None):
     except (json.JSONDecodeError, IOError):
         return config_path, False, "Could not read config file"
 
-    modified = False
+    # Check if we're configured
+    notebook_class = config.get("NotebookApp", {}).get("kernel_spec_manager_class")
+    server_class = config.get("ServerApp", {}).get("kernel_spec_manager_class")
 
-    # Remove our manager if it's set
+    if notebook_class != manager_class and server_class != manager_class:
+        return config_path, False, "VEnvKernelSpecManager not configured"
+
+    # Try to restore from backup first
+    if os.path.exists(backup_path):
+        try:
+            import shutil
+            shutil.copy2(backup_path, config_path)
+            os.remove(backup_path)
+            return config_path, True, "Restored from backup"
+        except IOError:
+            pass  # Fall through to manual removal
+
+    # No backup - manually remove our settings
+    modified = False
     for app in ["NotebookApp", "ServerApp"]:
         if app in config and config[app].get("kernel_spec_manager_class") == manager_class:
             del config[app]["kernel_spec_manager_class"]
@@ -265,6 +300,9 @@ def main():
             config_path, updated, message = update_jupyter_config(args.path)
             if updated:
                 print(f"Configured: {config_path}")
+                backup_path = get_backup_path(config_path)
+                if os.path.exists(backup_path):
+                    print(f"Backup saved: {backup_path}")
                 print("Restart JupyterLab for changes to take effect.")
             else:
                 print(f"{message}: {config_path}")
@@ -273,7 +311,10 @@ def main():
         elif args.action == "disable":
             config_path, updated, message = remove_jupyter_config(args.path)
             if updated:
-                print(f"Removed from: {config_path}")
+                if message == "Restored from backup":
+                    print(f"Restored: {config_path}")
+                else:
+                    print(f"Removed from: {config_path}")
                 print("Restart JupyterLab for changes to take effect.")
             else:
                 print(f"{message}: {config_path}")

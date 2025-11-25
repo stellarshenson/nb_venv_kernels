@@ -88,15 +88,8 @@ class VEnvKernelSpecManager(KernelSpecManager):
         if self.env_filter is not None:
             self._env_filter_regex = re.compile(self.env_filter)
 
-        self.log.info("nb_venv_kernels | VEnvKernelSpecManager initialized")
-        self.log.info("nb_venv_kernels | conda support: %s", _HAS_CONDA)
-        self.log.info("nb_venv_kernels | venv_only=%s, env_filter=%s", self.venv_only, self.env_filter)
-
-        # Force initial scan and log results
-        kspecs = self._venv_kspecs
-        self.log.info("nb_venv_kernels | Found %s venv kernels", len(kspecs))
-        for name in kspecs:
-            self.log.info("nb_venv_kernels |   - %s", name)
+        # Force initial scan
+        _ = self._venv_kspecs
 
     @staticmethod
     def clean_kernel_name(kname):
@@ -118,15 +111,9 @@ class VEnvKernelSpecManager(KernelSpecManager):
         all_envs = {}
         seen_names = {}
 
-        registered = read_environments()
-        self.log.debug("nb_venv_kernels | _all_envs: registry returned %s environments", len(registered))
-
-        for env_path in registered:
-            self.log.debug("nb_venv_kernels | _all_envs: processing %s", env_path)
-
+        for env_path in read_environments():
             # Apply filter if configured
             if self.env_filter and self._env_filter_regex.search(env_path):
-                self.log.debug("nb_venv_kernels | _all_envs: filtered out by env_filter")
                 continue
 
             # Derive environment name from path
@@ -145,9 +132,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 seen_names[env_name] = 1
 
             all_envs[env_name] = env_path
-            self.log.debug("nb_venv_kernels | _all_envs: added %s -> %s", env_name, env_path)
 
-        self.log.debug("nb_venv_kernels | _all_envs: returning %s environments", len(all_envs))
         return all_envs
 
     def _all_venv_specs(self):
@@ -157,20 +142,13 @@ class VEnvKernelSpecManager(KernelSpecManager):
             Dict mapping kernel names to kernel spec dicts.
         """
         all_specs = {}
-        all_envs = self._all_envs()
 
-        self.log.debug("nb_venv_kernels | _all_venv_specs: scanning %s environments", len(all_envs))
-
-        for env_name, env_path in all_envs.items():
+        for env_name, env_path in self._all_envs().items():
             kspec_base = join(env_path, "share", "jupyter", "kernels")
-            self.log.debug("nb_venv_kernels | _all_venv_specs: scanning %s", kspec_base)
-
             if not os.path.isdir(kspec_base):
-                self.log.debug("nb_venv_kernels | _all_venv_specs: directory does not exist, skipping")
                 continue
 
             kspec_glob = glob.glob(join(kspec_base, "*", "kernel.json"))
-            self.log.debug("nb_venv_kernels | _all_venv_specs: found %s kernel.json files", len(kspec_glob))
 
             for spec_path in kspec_glob:
                 try:
@@ -219,9 +197,36 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
                 spec["display_name"] = display_name
 
-                # Prepend runner command for non-current environments
+                # Configure kernel to use venv's python directly with proper environment
                 if not is_current:
-                    spec["argv"] = RUNNER_COMMAND + [env_path] + spec["argv"]
+                    # Replace python with venv's python path
+                    venv_python = join(env_path, "bin", "python")
+                    if os.path.exists(venv_python):
+                        # Replace first argv element (python) with venv python
+                        spec["argv"][0] = venv_python
+
+                    # Set environment variables so !pip and subprocesses work
+                    venv_bin = join(env_path, "bin")
+
+                    # Build PATH: venv bin first, then rest of PATH
+                    # Keep conda base bin for tools (pip, uv), skip only other conda env bins
+                    path_parts = [venv_bin]
+                    for p in os.environ.get("PATH", "").split(os.pathsep):
+                        # Skip other conda environment paths (envs/*/bin)
+                        if "/envs/" in p and "/bin" in p:
+                            continue
+                        if p and p not in path_parts:
+                            path_parts.append(p)
+
+                    spec["env"] = {
+                        "VIRTUAL_ENV": env_path,
+                        "PATH": os.pathsep.join(path_parts),
+                        # Clear conda activation state but keep tools accessible
+                        "CONDA_PREFIX": "",
+                        "CONDA_DEFAULT_ENV": "",
+                        "CONDA_PROMPT_MODIFIER": "",
+                        "CONDA_SHLVL": "0",
+                    }
 
                 # Add metadata
                 metadata = spec.get("metadata", {})
@@ -237,9 +242,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
                 spec["resource_dir"] = abspath(kernel_dir)
                 all_specs[kernel_name] = spec
-                self.log.debug("nb_venv_kernels | _all_venv_specs: added kernel %s", kernel_name)
 
-        self.log.debug("nb_venv_kernels | _all_venv_specs: returning %s kernels", len(all_specs))
         return all_specs
 
     @property
@@ -267,44 +270,29 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
     def find_kernel_specs(self):
         """Returns a dict mapping kernel names to resource directories."""
-        self.log.debug("nb_venv_kernels | find_kernel_specs called")
-
         if self.venv_only:
             kspecs = {}
-            self.log.debug("nb_venv_kernels | venv_only=True, starting with empty kspecs")
         else:
-            # Get system kernels
             kspecs = super(VEnvKernelSpecManager, self).find_kernel_specs()
-            self.log.debug("nb_venv_kernels | system kernels: %s", len(kspecs))
 
         # Add venv kernels
         venv_kspecs = self._venv_kspecs
-        self.log.debug("nb_venv_kernels | adding %s venv kernels", len(venv_kspecs))
-
-        # Build reverse map for duplicate detection (resource_dir -> kernel_name)
         spec_rev = {v: k for k, v in kspecs.items()}
 
         for name, spec in venv_kspecs.items():
-            # Check if a system kernel has the same resource_dir (different name)
+            # Remove system kernel with same resource_dir
             dup = spec_rev.get(spec.resource_dir)
             if dup and dup != name:
-                self.log.debug("nb_venv_kernels | removing duplicate %s in favor of %s", dup, name)
                 del kspecs[dup]
-
             kspecs[name] = spec.resource_dir
 
-        # Add conda kernels if available, removing duplicate system kernels
+        # Add conda kernels, removing duplicate system kernels
         if _HAS_CONDA and not self.venv_only:
             conda_kspecs = self._conda_kspecs
-            self.log.debug("nb_venv_kernels | adding %s conda kernels", len(conda_kspecs))
-
-            # Build set of conda resource dirs to detect duplicates
             conda_resource_dirs = {spec.resource_dir for spec in conda_kspecs.values()}
 
-            # Remove system kernels that duplicate conda kernels
             for sys_name in list(kspecs.keys()):
                 if kspecs[sys_name] in conda_resource_dirs:
-                    self.log.debug("nb_venv_kernels | removing system kernel %s (duplicated by conda)", sys_name)
                     del kspecs[sys_name]
 
             for name, spec in conda_kspecs.items():
@@ -316,7 +304,6 @@ class VEnvKernelSpecManager(KernelSpecManager):
         if allow:
             kspecs = {k: v for k, v in kspecs.items() if k in allow}
 
-        self.log.debug("nb_venv_kernels | find_kernel_specs returning %s kernels: %s", len(kspecs), list(kspecs.keys()))
         return kspecs
 
     def get_kernel_spec(self, kernel_name):
