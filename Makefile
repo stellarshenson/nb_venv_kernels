@@ -25,7 +25,7 @@ build: clean increment_version check_dependencies
 	python -m build
 
 ## install package
-install: build 
+install: build
 	pip install dist/*.whl --force-reinstall
 
 ## clean builds and installables
@@ -35,8 +35,8 @@ clean: uninstall  check_dependencies
 	rm -rf dist lib || true
 
 ## uninstall package
-uninstall:  check_dependencies
-	pip uninstall -y dist/*.whl 2>/dev/null || true
+uninstall: check_dependencies
+	pip uninstall -y nb_venv_kernels 2>/dev/null || true
 
 ## check if required dependencies are installed
 check_dependencies:
