@@ -7,9 +7,9 @@ node_modules/
 *.egg-info/
 .ipynb_checkpoints
 *.tsbuildinfo
-nb_uv_kernels/labextension
+nb_venv_kernels/labextension
 # Version file is handled by hatchling
-nb_uv_kernels/_version.py
+nb_venv_kernels/_version.py
 
 # Integration tests
 ui-tests/test-results/

@@ -3,7 +3,7 @@ requires = ["hatchling>=1.5.0", "jupyterlab>=4.0.0,<5", "hatch-nodejs-version>=0
 build-backend = "hatchling.build"
 
 [project]
-name = "nb_uv_kernels"
+name = "nb_venv_kernels"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
@@ -23,14 +23,11 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "jupyter_server>=2.4.0,<3",
-    "jupyter_client>=7.0.0",
-    "traitlets>=5.0.0",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
 [project.scripts]
-nb_uv_kernels = "nb_uv_kernels.cli:main"
+nb_venv_kernels = "nb_venv_kernels.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -51,25 +48,25 @@ source = "nodejs"
 fields = ["description", "authors", "urls", "keywords"]
 
 [tool.hatch.build.targets.sdist]
-artifacts = ["nb_uv_kernels/labextension"]
+artifacts = ["nb_venv_kernels/labextension"]
 exclude = [".github", "binder"]
 
 [tool.hatch.build.targets.wheel.shared-data]
-"nb_uv_kernels/labextension" = "share/jupyter/labextensions/nb_uv_kernels"
-"install.json" = "share/jupyter/labextensions/nb_uv_kernels/install.json"
+"nb_venv_kernels/labextension" = "share/jupyter/labextensions/nb_venv_kernels"
+"install.json" = "share/jupyter/labextensions/nb_venv_kernels/install.json"
 "jupyter-config/server-config" = "etc/jupyter/jupyter_server_config.d"
 
 [tool.hatch.build.hooks.version]
-path = "nb_uv_kernels/_version.py"
+path = "nb_venv_kernels/_version.py"
 
 [tool.hatch.build.hooks.jupyter-builder]
 dependencies = ["hatch-jupyter-builder>=0.5"]
 build-function = "hatch_jupyter_builder.npm_builder"
 ensured-targets = [
-    "nb_uv_kernels/labextension/static/style.js",
-    "nb_uv_kernels/labextension/package.json",
+    "nb_venv_kernels/labextension/static/style.js",
+    "nb_venv_kernels/labextension/package.json",
 ]
-skip-if-exists = ["nb_uv_kernels/labextension/static/style.js"]
+skip-if-exists = ["nb_venv_kernels/labextension/static/style.js"]
 
 [tool.hatch.build.hooks.jupyter-builder.build-kwargs]
 build_cmd = "build:prod"
@@ -79,7 +76,7 @@ npm = ["jlpm"]
 build_cmd = "install:extension"
 npm = ["jlpm"]
 source_dir = "src"
-build_dir = "nb_uv_kernels/labextension"
+build_dir = "nb_venv_kernels/labextension"
 
 [tool.jupyter-releaser.options]
 version_cmd = "hatch version"

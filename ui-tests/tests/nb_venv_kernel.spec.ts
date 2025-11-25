@@ -16,6 +16,6 @@ test('should emit an activation console message', async ({ page }) => {
   await page.goto();
 
   expect(
-    logs.filter(s => s === 'JupyterLab extension nb_uv_kernels is activated!')
+    logs.filter(s => s === 'JupyterLab extension nb_venv_kernels is activated!')
   ).toHaveLength(1);
 });

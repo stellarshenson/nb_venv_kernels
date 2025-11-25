@@ -1,4 +1,4 @@
-# Making a new release of nb_uv_kernels
+# Making a new release of nb_venv_kernels
 
 The extension can be published to `PyPI` and `npm` manually or using the [Jupyter Releaser](https://github.com/jupyter-server/jupyter_releaser).
 

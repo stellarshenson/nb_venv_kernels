@@ -13,7 +13,7 @@ class HelloRouteHandler(APIHandler):
         self.finish(json.dumps({
             "data": (
                 "Hello, world!"
-                " This is the '/nb-uv-kernels/hello' endpoint."
+                " This is the '/nb-venv-kernels/hello' endpoint."
                 " Try visiting me in your browser!"
             ),
         }))
@@ -23,7 +23,7 @@ def setup_route_handlers(web_app):
     host_pattern = ".*$"
     base_url = web_app.settings["base_url"]
 
-    hello_route_pattern = url_path_join(base_url, "nb-uv-kernels", "hello")
+    hello_route_pattern = url_path_join(base_url, "nb-venv-kernels", "hello")
     handlers = [(hello_route_pattern, HelloRouteHandler)]
 
     web_app.add_handlers(host_pattern, handlers)

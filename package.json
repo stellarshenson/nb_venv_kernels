@@ -1,6 +1,6 @@
 {
-    "name": "nb_uv_kernels",
-    "version": "0.9.15",
+    "name": "nb_venv_kernels",
+    "version": "0.9.20",
     "description": "Jupyterlab extension to detect notebook kernels similarly to how nb_conda_kernel does",
     "keywords": [
         "jupyter",
@@ -38,7 +38,7 @@
         "clean": "jlpm clean:lib",
         "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
         "clean:lintcache": "rimraf .eslintcache .stylelintcache",
-        "clean:labextension": "rimraf nb_uv_kernels/labextension nb_uv_kernels/_version.py",
+        "clean:labextension": "rimraf nb_venv_kernels/labextension nb_venv_kernels/_version.py",
         "clean:all": "jlpm clean:lib && jlpm clean:labextension && jlpm clean:lintcache",
         "eslint": "jlpm eslint:check --fix",
         "eslint:check": "eslint . --cache --ext .ts,.tsx",
@@ -103,12 +103,12 @@
                     "pip"
                 ],
                 "base": {
-                    "name": "nb_uv_kernels"
+                    "name": "nb_venv_kernels"
                 }
             }
         },
         "extension": true,
-        "outputDir": "nb_uv_kernels/labextension"
+        "outputDir": "nb_venv_kernels/labextension"
     },
     "eslintIgnore": [
         "node_modules",

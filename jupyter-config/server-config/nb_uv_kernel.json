@@ -1,8 +1,0 @@
-{
-  "ServerApp": {
-    "jpserver_extensions": {
-      "nb_uv_kernels": true
-    },
-    "kernel_spec_manager_class": "nb_uv_kernels.UvKernelSpecManager"
-  }
-}

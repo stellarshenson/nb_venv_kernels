@@ -1,5 +1,5 @@
 {
   "packageManager": "python",
-  "packageName": "nb_uv_kernels",
-  "uninstallInstructions": "Use your Python package manager (pip, conda, etc.) to uninstall the package nb_uv_kernels"
+  "packageName": "nb_venv_kernels",
+  "uninstallInstructions": "Use your Python package manager (pip, conda, etc.) to uninstall the package nb_venv_kernels"
 }

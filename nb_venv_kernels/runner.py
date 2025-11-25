@@ -2,7 +2,7 @@
 """Runner script for launching kernels in uv/venv environments.
 
 This module activates a virtual environment and executes the kernel command.
-Called by Jupyter with: python -m nb_uv_kernels.runner <env_path> <command...>
+Called by Jupyter with: python -m nb_venv_kernels.runner <env_path> <command...>
 """
 from __future__ import print_function
 
@@ -54,7 +54,7 @@ def exec_in_env(env_path, *command):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: python -m nb_uv_kernels.runner <env_path> <command...>", file=sys.stderr)
+        print("Usage: python -m nb_venv_kernels.runner <env_path> <command...>", file=sys.stderr)
         sys.exit(1)
 
     env_path = sys.argv[1]

@@ -6,14 +6,14 @@ import {
 import { requestAPI } from './request';
 
 /**
- * Initialization data for the nb_uv_kernels extension.
+ * Initialization data for the nb_venv_kernels extension.
  */
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'nb_uv_kernels:plugin',
+  id: 'nb_venv_kernels:plugin',
   description: 'Jupyterlab extension to detect notebook kernels similarly to how nb_conda_kernel does',
   autoStart: true,
   activate: (app: JupyterFrontEnd) => {
-    console.log('JupyterLab extension nb_uv_kernels is activated!');
+    console.log('JupyterLab extension nb_venv_kernels is activated!');
 
     requestAPI<any>('hello')
       .then(data => {
@@ -21,7 +21,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
       })
       .catch(reason => {
         console.error(
-          `The nb_uv_kernels server extension appears to be missing.\n${reason}`
+          `The nb_venv_kernels server extension appears to be missing.\n${reason}`
         );
       });
   }

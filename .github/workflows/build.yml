@@ -36,31 +36,31 @@ jobs:
         python -m pip install .[test]
 
         jupyter server extension list
-        jupyter server extension list 2>&1 | grep -ie "nb_uv_kernels.*OK"
+        jupyter server extension list 2>&1 | grep -ie "nb_venv_kernels.*OK"
 
         jupyter labextension list
-        jupyter labextension list 2>&1 | grep -ie "nb_uv_kernels.*OK"
+        jupyter labextension list 2>&1 | grep -ie "nb_venv_kernels.*OK"
 
     - name: Run Python tests
       run: |
         set -eux
-        pytest -vv -r ap --cov nb_uv_kernels nb_uv_kernels/tests/
+        pytest -vv -r ap --cov nb_venv_kernels nb_venv_kernels/tests/
 
     - name: Test CLI
       run: |
         set -eux
         # Test CLI commands
-        nb_uv_kernels list
+        nb_venv_kernels list
 
         # Create test venv and register
         python -m venv /tmp/test-venv
         /tmp/test-venv/bin/pip install ipykernel
-        nb_uv_kernels register /tmp/test-venv
-        nb_uv_kernels list | grep -i test-venv
+        nb_venv_kernels register /tmp/test-venv
+        nb_venv_kernels list | grep -i test-venv
 
         # Verify kernel discovery
         python -c "
-        from nb_uv_kernels.manager import UvKernelSpecManager
+        from nb_venv_kernels.manager import UvKernelSpecManager
         m = UvKernelSpecManager()
         specs = m.find_kernel_specs()
         print('Found kernels:', list(specs.keys()))
@@ -68,21 +68,21 @@ jobs:
         "
 
         # Unregister
-        nb_uv_kernels unregister /tmp/test-venv
-        nb_uv_kernels list | grep -v test-venv || true
+        nb_venv_kernels unregister /tmp/test-venv
+        nb_venv_kernels list | grep -v test-venv || true
 
     - name: Package the extension
       run: |
         set -eux
         pip install build
         python -m build
-        pip uninstall -y "nb_uv_kernels" jupyterlab
+        pip uninstall -y "nb_venv_kernels" jupyterlab
 
     - name: Upload extension packages
       uses: actions/upload-artifact@v4
       with:
         name: extension-artifacts
-        path: dist/nb_uv_kernels*
+        path: dist/nb_venv_kernels*
         if-no-files-found: error
 
   test_isolated:
@@ -107,13 +107,13 @@ jobs:
         sudo rm -rf $(which node) || true
         sudo rm -rf $(which node) || true
 
-        pip install "jupyterlab>=4.0.0,<5" nb_uv_kernels*.whl
+        pip install "jupyterlab>=4.0.0,<5" nb_venv_kernels*.whl
 
         jupyter server extension list
-        jupyter server extension list 2>&1 | grep -ie "nb_uv_kernels.*OK"
+        jupyter server extension list 2>&1 | grep -ie "nb_venv_kernels.*OK"
 
         # Test kernel discovery works
-        nb_uv_kernels list
+        nb_venv_kernels list
 
   check_links:
     name: Check Links

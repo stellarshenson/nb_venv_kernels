@@ -3,4 +3,4 @@ node_modules
 **/lib
 **/package.json
 !/package.json
-nb_uv_kernels
+nb_venv_kernels
