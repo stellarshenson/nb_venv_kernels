@@ -2,13 +2,15 @@
 
 Composite Jupyter kernel spec manager that discovers kernels from conda, venv and uv Python environments. Combines functionality of nb_conda_kernels with venv/uv environment discovery.
 
+![UV and Conda virtual environments co-exist and are properly discovered](.resources/screenshot.png)
+
 ## Install
 
 ```bash
 pip install nb_venv_kernels
 ```
 
-`VEnvKernelSpecManager` is auto-enabled via `jupyter_server_config.json`, which takes precedence over nb_conda_kernels' settings in `jupyter_config.json`.
+The extension installs itself as the default kernel spec manager via `jupyter_config.json`. If nb_conda_kernels is installed, nb_venv_kernels takes precedence and includes all conda kernel discovery functionality.
 
 ## Usage
 
@@ -54,6 +56,7 @@ c.VEnvKernelSpecManager.name_format = "{language} [{source} env:{environment}]" 
 ## Uninstall
 
 ```bash
-nb_venv_kernels config disable
 pip uninstall nb_venv_kernels
 ```
+
+After uninstall, nb_conda_kernels (if installed) will resume handling kernel discovery.

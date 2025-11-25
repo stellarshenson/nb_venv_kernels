@@ -45,3 +45,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 14. **Task - Fix config precedence over nb_conda_kernels**: Restructured config installation to override nb_conda_kernels settings<br>
     **Result**: Install jupyter_config.json directly (same location as nb_conda_kernels), add notebook-config.d for NotebookApp extensions, server-config.d for ServerApp extensions, updated pyproject.toml shared-data to install all config files
+
+15. **Task - Add screenshot and fix npm URLs**: Added screenshot to README, fixed package.json for npm publishing<br>
+    **Result**: Added .resources/screenshot.png to README showing kernel selector, fixed homepage/bugs/repository URLs in package.json to pass jupyter-releaser check-npm

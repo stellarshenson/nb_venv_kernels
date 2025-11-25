@@ -1,15 +1,15 @@
 {
     "name": "nb_venv_kernels",
-    "version": "0.9.29",
+    "version": "1.0.29",
     "description": "Jupyterlab extension to detect notebook kernels similarly to how nb_conda_kernel does",
     "keywords": [
         "jupyter",
         "jupyterlab",
         "jupyterlab-extension"
     ],
-    "homepage": "",
+    "homepage": "https://github.com/stellarshenson/nb_venv_kernels",
     "bugs": {
-        "url": "/issues"
+        "url": "https://github.com/stellarshenson/nb_venv_kernels/issues"
     },
     "license": "BSD-3-Clause",
     "author": {
@@ -26,7 +26,7 @@
     "style": "style/index.css",
     "repository": {
         "type": "git",
-        "url": ".git"
+        "url": "https://github.com/stellarshenson/nb_venv_kernels.git"
     },
     "scripts": {
         "build": "jlpm build:lib && jlpm build:labextension:dev",
