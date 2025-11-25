@@ -22,28 +22,11 @@ except ImportError:
     CondaKernelSpecManager = None
     _HAS_CONDA = False
 
-from .registry import read_environments
+from .registry import read_environments, is_uv_environment
 
 CACHE_TIMEOUT = 60
 
 RUNNER_COMMAND = ["python", "-m", "nb_venv_kernels.runner"]
-
-
-def is_uv_environment(env_path):
-    """Check if environment was created by uv.
-
-    uv creates pyvenv.cfg with 'uv = <version>' line.
-    """
-    pyvenv_cfg = join(env_path, "pyvenv.cfg")
-    if os.path.exists(pyvenv_cfg):
-        try:
-            with open(pyvenv_cfg, "r") as f:
-                for line in f:
-                    if line.strip().startswith("uv ="):
-                        return True
-        except IOError:
-            pass
-    return False
 
 
 class VEnvKernelSpecManager(KernelSpecManager):

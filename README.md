@@ -34,11 +34,12 @@ Registered environments with ipykernel appear in JupyterLab's kernel selector.
 
 ## How It Works
 
-- Reads venv registry from `~/.venv/environments.txt`
+- **venv environments**: Registry at `~/.venv/environments.txt`
+- **uv environments**: Registry at `~/.uv/environments.txt`, auto-detected via `pyvenv.cfg`
+- **conda environments**: Discovers via `CondaKernelSpecManager` if nb_conda_kernels is installed
 - Scans `{path}/share/jupyter/kernels/*/kernel.json` for each registered environment
 - Configures kernel to use venv's python directly with `VIRTUAL_ENV` and `PATH` environment variables
 - Caches results for 60 seconds
-- Combines with `CondaKernelSpecManager` if available for unified conda + venv discovery
 - `config enable` backs up existing config, `config disable` restores from backup
 
 ## Configuration

@@ -48,3 +48,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 15. **Task - Add screenshot and fix npm URLs**: Added screenshot to README, fixed package.json for npm publishing<br>
     **Result**: Added .resources/screenshot.png to README showing kernel selector, fixed homepage/bugs/repository URLs in package.json to pass jupyter-releaser check-npm
+
+16. **Task - Separate registries for venv and uv**: Split environment registries by source type<br>
+    **Result**: venv environments at `~/.venv/environments.txt`, uv environments at `~/.uv/environments.txt`, auto-detection via pyvenv.cfg on register, consolidated is_uv_environment in registry.py
