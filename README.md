@@ -8,7 +8,7 @@ Composite Jupyter kernel spec manager that discovers kernels from conda, venv an
 pip install nb_venv_kernels
 ```
 
-The `VEnvKernelSpecManager` is auto-enabled via `jupyter_server_config.d`. If nb_conda_kernels is also installed and takes precedence, run `nb_venv_kernels config enable` to update the main Jupyter config.
+`VEnvKernelSpecManager` is auto-enabled via `jupyter_server_config.json`, which takes precedence over nb_conda_kernels' settings in `jupyter_config.json`.
 
 ## Usage
 

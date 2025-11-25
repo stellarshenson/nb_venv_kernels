@@ -55,6 +55,8 @@ exclude = [".github", "binder"]
 "nb_venv_kernels/labextension" = "share/jupyter/labextensions/nb_venv_kernels"
 "install.json" = "share/jupyter/labextensions/nb_venv_kernels/install.json"
 "jupyter-config/server-config" = "etc/jupyter/jupyter_server_config.d"
+"jupyter-config/notebook-config" = "etc/jupyter/jupyter_notebook_config.d"
+"jupyter-config/jupyter_config.json" = "etc/jupyter/jupyter_config.json"
 
 [tool.hatch.build.hooks.version]
 path = "nb_venv_kernels/_version.py"

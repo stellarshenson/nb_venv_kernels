@@ -42,3 +42,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 13. **Task - Remove console error**: Simplified labextension to not require server extension API<br>
     **Result**: Removed API call from index.ts, deleted request.ts, extension now just logs activation message without calling server endpoints
+
+14. **Task - Fix config precedence over nb_conda_kernels**: Restructured config installation to override nb_conda_kernels settings<br>
+    **Result**: Install jupyter_config.json directly (same location as nb_conda_kernels), add notebook-config.d for NotebookApp extensions, server-config.d for ServerApp extensions, updated pyproject.toml shared-data to install all config files

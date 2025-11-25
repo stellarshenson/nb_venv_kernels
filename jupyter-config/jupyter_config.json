@@ -1,0 +1,8 @@
+{
+  "NotebookApp": {
+    "kernel_spec_manager_class": "nb_venv_kernels.VEnvKernelSpecManager"
+  },
+  "ServerApp": {
+    "kernel_spec_manager_class": "nb_venv_kernels.VEnvKernelSpecManager"
+  }
+}
