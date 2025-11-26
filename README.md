@@ -30,7 +30,14 @@ The extension installs itself as the default kernel spec manager via `jupyter_co
 
 ## Usage
 
-Register environments after installing ipykernel:
+Virtual environments require `ipykernel` installed to be discoverable. The `ipykernel` package creates the kernel spec at `{env}/share/jupyter/kernels/*/kernel.json`.
+
+```bash
+# In your virtual environment
+pip install ipykernel
+```
+
+Then register the environment:
 
 ```bash
 nb_venv_kernels register /path/to/.venv
@@ -59,6 +66,42 @@ Environments are registered in separate files based on their source:
 The `register` command auto-detects uv environments via `pyvenv.cfg` and writes to the appropriate registry.
 
 ## How It Works
+
+```mermaid
+flowchart LR
+    subgraph Registries
+        VENV[~/.venv/environments.txt]
+        UV[~/.uv/environments.txt]
+        CONDA_REG[~/.conda/environments.txt]
+    end
+
+    subgraph Auto-Discovery
+        CONDA_ENV[conda env list]
+        PYVENV[pyvenv.cfg]
+    end
+
+    subgraph Discovery
+        KSPM[VEnvKernelSpecManager]
+        CKSPM[CondaKernelSpecManager]
+    end
+
+    VENV --> KSPM
+    UV --> KSPM
+    PYVENV -.->|detects uv| UV
+    CONDA_REG --> CKSPM
+    CONDA_ENV --> CKSPM
+    CKSPM --> KSPM
+    KSPM --> JL[JupyterLab Kernel Selector]
+
+    style VENV stroke:#10b981,stroke-width:2px
+    style UV stroke:#a855f7,stroke-width:2px
+    style CONDA_REG stroke:#f59e0b,stroke-width:2px
+    style CONDA_ENV stroke:#f59e0b,stroke-width:2px
+    style PYVENV stroke:#6b7280,stroke-width:2px
+    style KSPM stroke:#3b82f6,stroke-width:3px
+    style CKSPM stroke:#f59e0b,stroke-width:2px
+    style JL stroke:#0284c7,stroke-width:3px
+```
 
 - Scans `{path}/share/jupyter/kernels/*/kernel.json` for each registered environment
 - Configures kernel to use venv's python directly with `VIRTUAL_ENV` and `PATH` environment variables
