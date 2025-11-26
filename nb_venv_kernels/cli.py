@@ -21,12 +21,20 @@ class Colors:
     GREEN = "\033[32m"
     BLUE = "\033[94m"
     ORANGE = "\033[38;5;208m"
+    RED = "\033[31m"
     RESET = "\033[0m"
 
     @classmethod
     def enabled(cls) -> bool:
         """Check if colors should be used."""
         return sys.stdout.isatty()
+
+    @classmethod
+    def red(cls, text: str) -> str:
+        """Return text in red if colors enabled."""
+        if cls.enabled():
+            return f"{cls.RED}{text}{cls.RESET}"
+        return text
 
     @classmethod
     def green(cls, text: str) -> str:
@@ -530,8 +538,8 @@ def main():
             for env in envs:
                 name = _get_env_display_name(env['path'], env.get("type", "venv"))
                 env_type = _get_env_type_display(env['path'], env.get("type", "venv"))
-                exists = "yes" if env["exists"] else "NO"
-                kernel = "yes" if env["has_kernel"] else "no"
+                exists = "yes" if env["exists"] else Colors.red("no") + " " * 6
+                kernel = "yes" if env["has_kernel"] else Colors.red("no") + " " * 6
                 # Use relative path except for conda global
                 if env.get("type") == "conda" and _is_conda_global(env['path']):
                     display_path = env['path']
@@ -657,8 +665,8 @@ def main():
                 for name, env_type, action, exists, has_kernel, path, _ in rows:
                     # Pad action before colorizing to maintain alignment
                     action_colored = colorize_action(action) + " " * (10 - len(action))
-                    exists_str = "yes" if exists else "NO"
-                    kernel_str = "yes" if has_kernel else "no"
+                    exists_str = "yes" if exists else Colors.red("no") + " " * 6
+                    kernel_str = "yes" if has_kernel else Colors.red("no") + " " * 6
                     # Use relative path except for conda global
                     if env_type == "conda" and _is_conda_global(path):
                         display_path = path

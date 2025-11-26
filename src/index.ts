@@ -84,15 +84,15 @@ function buildResultsContent(result: IScanResult): string {
         actionStyle = 'color: #f97316;';
       }
 
-      const existsIcon = env.exists ? 'yes' : 'no';
-      const kernelIcon = env.has_kernel ? 'yes' : 'no';
+      const existsText = env.exists ? 'yes' : '<span style="color: #ef4444;">no</span>';
+      const kernelText = env.has_kernel ? 'yes' : '<span style="color: #ef4444;">no</span>';
 
       return `<tr>
       <td style="${actionStyle} padding: 4px 8px;">${env.action}</td>
       <td style="padding: 4px 8px;">${env.name}</td>
       <td style="padding: 4px 8px;">${env.type}</td>
-      <td style="padding: 4px 8px;">${existsIcon}</td>
-      <td style="padding: 4px 8px;">${kernelIcon}</td>
+      <td style="padding: 4px 8px;">${existsText}</td>
+      <td style="padding: 4px 8px;">${kernelText}</td>
       <td style="padding: 4px 8px; font-family: var(--jp-code-font-family); font-size: 0.9em;">${env.path}</td>
     </tr>`;
     })

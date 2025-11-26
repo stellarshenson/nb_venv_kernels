@@ -79,15 +79,15 @@ nb_venv_kernels list
 ```
 
 ```
-NAME                      TYPE             EXISTS   KERNEL   PATH
+name                      type             exists   kernel   path
 --------------------------------------------------------------------------------------------------------------
-base                      conda (global)   yes      yes      /opt/conda
+base                      conda            yes      yes      /opt/conda
 my-conda-env              conda (local)    yes      yes      /opt/conda/envs/my-conda-env
 my-project                uv               yes      yes      /home/user/my-project/.venv
 another-project           venv             yes      no       /home/user/another-project/venv
 ```
 
-Environments are sorted by type (conda global, conda local, uv, venv) then by name. The KERNEL column indicates whether `ipykernel` is installed.
+Environments are sorted by type (conda, uv, venv) then by name. The KERNEL column indicates whether `ipykernel` is installed. Missing environments and kernels display "no" in red.
 
 ### Jupyter Configuration
 
