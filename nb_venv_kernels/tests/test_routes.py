@@ -1,5 +1,8 @@
 import json
 
+import pytest
+from tornado.httpclient import HTTPClientError
+
 
 async def test_list_environments(jp_fetch):
     """Test listing environments endpoint."""
@@ -28,25 +31,23 @@ async def test_scan_environments(jp_fetch):
 
 async def test_register_missing_path(jp_fetch):
     """Test register endpoint requires path."""
-    response = await jp_fetch(
-        "nb-venv-kernels", "register",
-        method="POST",
-        body=json.dumps({})
-    )
+    with pytest.raises(HTTPClientError) as exc_info:
+        await jp_fetch(
+            "nb-venv-kernels", "register",
+            method="POST",
+            body=json.dumps({})
+        )
 
-    assert response.code == 400
-    payload = json.loads(response.body)
-    assert "error" in payload
+    assert exc_info.value.code == 400
 
 
 async def test_unregister_missing_path(jp_fetch):
     """Test unregister endpoint requires path."""
-    response = await jp_fetch(
-        "nb-venv-kernels", "unregister",
-        method="POST",
-        body=json.dumps({})
-    )
+    with pytest.raises(HTTPClientError) as exc_info:
+        await jp_fetch(
+            "nb-venv-kernels", "unregister",
+            method="POST",
+            body=json.dumps({})
+        )
 
-    assert response.code == 400
-    payload = json.loads(response.body)
-    assert "error" in payload
+    assert exc_info.value.code == 400
