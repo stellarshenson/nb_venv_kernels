@@ -16,7 +16,7 @@ Use Python virtual environments as Jupyter kernels. Discovers and registers kern
 - **Unified kernel discovery** - conda, venv, and uv environments in one kernel selector
 - **Auto-detection** - distinguishes uv from venv via `pyvenv.cfg`
 - **Smart ordering** - current environment first, then conda, uv, venv, system
-- **Drop-in replacement** - replaces nb_conda_kernels while preserving all conda functionality
+- **Drop-in replacement** - replaces [nb_conda_kernels](https://github.com/Anaconda-Platform/nb_conda_kernels) while preserving all conda functionality
 - **CLI management** - register, unregister, and list environments
 - **Zero config** - auto-enables on install, works immediately
 
