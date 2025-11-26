@@ -32,7 +32,9 @@ Results display in a modal with action indicators.
 - **Smart ordering** - current environment first, then conda, uv, venv, system
 - **Drop-in replacement** - replaces [nb_conda_kernels](https://github.com/Anaconda-Platform/nb_conda_kernels) while preserving all conda functionality
 - **Directory scanning** - scan project directories to find and register environments
-- **CLI management** - register, unregister, scan, list (all env types), and configure
+- **JupyterLab integration** - scan for environments from Kernel menu with results modal
+- **CLI management** - register, unregister, scan, list with color-coded status indicators
+- **Programmatic API** - REST endpoints and Python API for automation (`--json` flag)
 - **Zero config** - auto-enables on install, works immediately
 
 ## Install

@@ -99,3 +99,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 32. **Task - Modal CLI harmonization**: Aligned modal display format with CLI output. Changed table headers to lowercase (action, name, type, exists, kernel, path). Updated summary to use present tense matching CLI ("add", "keep", "remove" instead of "added", "kept", "removed"). Rewrote intro message to show counts concisely: "Found X environments: Y new, Z kept, W missing." Only displays relevant counts (omits zero values)<br>
     **Result**: Consistent presentation between CLI and frontend interfaces
+
+33. **Task - CI and README updates**: Updated GitHub workflow based on jupyterlab_tabular_data_viewer_extension reference. Added browser check step, integration tests with Playwright for ui-tests directory. Updated README Features section to reflect current capabilities: JupyterLab menu integration, color-coded CLI status, programmatic API with REST endpoints and --json flag<br>
+    **Result**: Complete CI pipeline and accurate feature documentation
