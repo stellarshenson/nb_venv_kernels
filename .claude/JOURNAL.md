@@ -109,5 +109,8 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 35. **Task - Modal sorting alignment**: Added sortEnvironments() function in index.ts to match CLI sort order. Updated NB_VENV_KERNELS_MECHANICS.md with new "Scan Output Ordering" section documenting the three-tier sort criteria<br>
     **Result**: Modal now sorts environments by action (add/keep/remove), then type (conda/uv/venv), then name alphabetically - identical to CLI behavior
 
-36. **Task - CLI/API harmonization docs**: Added CHANGELOG entry for 1.1.20 documenting CLI/API sorting harmonization. Added mermaid diagram to README showing CLI -> Manager and Menu -> REST -> Manager architecture<br>
-    **Result**: CHANGELOG updated with harmonization notes, README includes API architecture diagram showing both access paths converge on VEnvKernelSpecManager
+36. **Task - CLI/API harmonization docs**: Added CHANGELOG entry for 1.1.20 documenting CLI/API sorting harmonization. Added mermaid diagram to README showing unified architecture<br>
+    **Result**: CHANGELOG updated with harmonization notes, README includes API architecture diagram
+
+37. **Task - CLI uses REST API**: Refactored CLI to use REST API instead of direct VEnvKernelSpecManager calls. Added JupyterAPIClient class with server discovery via runtime files, authenticated requests. CLI now requires running Jupyter server (except config commands). Updated CHANGELOG with breaking change notice, updated mechanics doc with CLI server requirement<br>
+    **Result**: Single code path - both CLI and JupyterLab frontend use same server-side logic via REST API. Ensures consistent behavior across all interfaces

@@ -210,7 +210,7 @@ flowchart TB
         MENU[JupyterLab Kernel Menu]
     end
 
-    subgraph API
+    subgraph Server[Jupyter Server]
         REST[REST Endpoints<br>/nb-venv-kernels/*]
         MGR[VEnvKernelSpecManager]
     end
@@ -220,7 +220,7 @@ flowchart TB
         UV_REG[~/.uv/environments.txt]
     end
 
-    CLI --> MGR
+    CLI --> REST
     MENU --> REST
     REST --> MGR
     MGR --> VENV_REG
@@ -234,7 +234,7 @@ flowchart TB
     style UV_REG stroke:#a855f7,stroke-width:2px
 ```
 
-CLI calls VEnvKernelSpecManager methods directly. JupyterLab frontend calls REST endpoints which delegate to the same manager. Both interfaces produce identical sorted output.
+Both CLI and JupyterLab frontend call REST endpoints on a running Jupyter server. The server delegates to VEnvKernelSpecManager. This unified architecture ensures consistent behavior across all interfaces.
 
 ## Uninstall
 

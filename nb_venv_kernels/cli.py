@@ -6,8 +6,9 @@ import os
 import sys
 import threading
 import time
-
-from .manager import VEnvKernelSpecManager
+import urllib.request
+import urllib.error
+import urllib.parse
 
 
 class Colors:
@@ -79,6 +80,112 @@ class Spinner:
             sys.stderr.flush()
         if final_message:
             print(final_message)
+
+
+class JupyterAPIClient:
+    """Client for nb_venv_kernels REST API."""
+
+    def __init__(self):
+        self.base_url = None
+        self.token = None
+        self._discover_server()
+
+    def _discover_server(self):
+        """Discover running Jupyter server from runtime files."""
+        try:
+            from jupyter_core.paths import jupyter_runtime_dir
+            runtime_dir = jupyter_runtime_dir()
+        except ImportError:
+            runtime_dir = os.path.expanduser("~/.local/share/jupyter/runtime")
+
+        if not os.path.isdir(runtime_dir):
+            return
+
+        # Find server info files
+        import glob
+        server_files = glob.glob(os.path.join(runtime_dir, "jpserver-*.json"))
+        server_files += glob.glob(os.path.join(runtime_dir, "nbserver-*.json"))
+
+        for server_file in sorted(server_files, key=os.path.getmtime, reverse=True):
+            try:
+                with open(server_file, "r") as f:
+                    info = json.load(f)
+                url = info.get("url", "")
+                token = info.get("token", "")
+                # Verify server is running by checking pid
+                pid = info.get("pid")
+                if pid and self._is_process_running(pid):
+                    self.base_url = url.rstrip("/")
+                    self.token = token
+                    return
+            except (json.JSONDecodeError, IOError, KeyError):
+                continue
+
+    def _is_process_running(self, pid: int) -> bool:
+        """Check if a process with given PID is running."""
+        try:
+            os.kill(pid, 0)
+            return True
+        except (OSError, ProcessLookupError):
+            return False
+
+    def is_available(self) -> bool:
+        """Check if server is available."""
+        return self.base_url is not None
+
+    def _request(self, method: str, endpoint: str, data: dict = None) -> dict:
+        """Make authenticated request to Jupyter server."""
+        url = f"{self.base_url}/nb-venv-kernels/{endpoint}"
+
+        headers = {"Content-Type": "application/json"}
+        if self.token:
+            headers["Authorization"] = f"token {self.token}"
+
+        body = json.dumps(data).encode("utf-8") if data else None
+
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8") if e.fp else ""
+            try:
+                error_data = json.loads(error_body)
+                raise RuntimeError(error_data.get("error", f"HTTP {e.code}: {e.reason}"))
+            except json.JSONDecodeError:
+                raise RuntimeError(f"HTTP {e.code}: {e.reason}")
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"Connection failed: {e.reason}")
+
+    def list_environments(self) -> list:
+        """List all registered environments."""
+        return self._request("GET", "environments")
+
+    def scan_environments(self, path: str, depth: int = None, dry_run: bool = False) -> dict:
+        """Scan directory for environments."""
+        data = {"path": path, "dry_run": dry_run}
+        if depth is not None:
+            data["depth"] = depth
+        return self._request("POST", "scan", data)
+
+    def register_environment(self, path: str) -> dict:
+        """Register an environment."""
+        return self._request("POST", "register", {"path": path})
+
+    def unregister_environment(self, path: str) -> dict:
+        """Unregister an environment."""
+        return self._request("POST", "unregister", {"path": path})
+
+
+def _get_api_client() -> JupyterAPIClient:
+    """Get API client, exit with error if server not available."""
+    client = JupyterAPIClient()
+    if not client.is_available():
+        print("Error: No running Jupyter server found.", file=sys.stderr)
+        print("Start JupyterLab first: jupyter lab", file=sys.stderr)
+        sys.exit(1)
+    return client
 
 
 def _is_conda_global(env_path: str) -> bool:
@@ -327,6 +434,7 @@ Options:
   scan --no-update    Dry run: scan and report without changes
 
 Notes:
+  - Requires a running Jupyter server (except for config commands)
   - scan and register also cleanup non-existent environments from registries
   - conda environments found during scan are reported but not registered
     (they are discovered automatically via conda env list)
@@ -339,6 +447,51 @@ Examples:
   nb_venv_kernels register /path/to/.venv
   nb_venv_kernels list
 """)
+
+
+def _handle_config_command(args):
+    """Handle config subcommand."""
+    if args.action == "enable":
+        config_path, updated, message = update_jupyter_config(args.path)
+        if updated:
+            print(f"Configured: {config_path}")
+            backup_path = get_backup_path(config_path)
+            if os.path.exists(backup_path):
+                print(f"Backup saved: {backup_path}")
+            print("Restart JupyterLab for changes to take effect.")
+        else:
+            print(f"{message}: {config_path}")
+        print()
+
+    elif args.action == "disable":
+        config_path, updated, message = remove_jupyter_config(args.path)
+        if updated:
+            if message == "Restored from backup":
+                print(f"Restored: {config_path}")
+            else:
+                print(f"Removed from: {config_path}")
+            print("Restart JupyterLab for changes to take effect.")
+        else:
+            print(f"{message}: {config_path}")
+        print()
+
+    elif args.action == "show":
+        config_dir = args.path or find_jupyter_config_dir()
+        config_path = os.path.join(config_dir, "jupyter_config.json")
+        print(f"Config directory: {config_dir}")
+        print(f"Config file: {config_path}")
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    config = json.load(f)
+                manager = config.get("ServerApp", {}).get("kernel_spec_manager_class", "not set")
+                print(f"kernel_spec_manager_class: {manager}")
+            except (json.JSONDecodeError, IOError):
+                print("Status: Could not read config file")
+        else:
+            print("Status: Config file does not exist")
+        print()
 
 
 def main():
@@ -442,11 +595,23 @@ def main():
         print_help()
         sys.exit(0)
 
-    # Create manager instance for all commands
-    manager = VEnvKernelSpecManager()
+    # Config command doesn't need API
+    if args.command == "config":
+        _handle_config_command(args)
+        return
+
+    # All other commands require running Jupyter server
+    client = _get_api_client()
 
     if args.command == "register":
-        result = manager.register_environment(args.path)
+        try:
+            result = client.register_environment(os.path.abspath(args.path))
+        except RuntimeError as e:
+            if getattr(args, 'json', False):
+                print(json.dumps({"error": str(e)}))
+            else:
+                print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
 
         if getattr(args, 'json', False):
             print(json.dumps(result, indent=2))
@@ -461,15 +626,26 @@ def main():
             print()
 
     elif args.command == "unregister":
-        result = manager.unregister_environment(args.path)
-        if result["unregistered"]:
+        try:
+            result = client.unregister_environment(os.path.abspath(args.path))
+        except RuntimeError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+        if result.get("unregistered"):
             print(f"Unregistered: {result['path']}")
         else:
             print(f"Not found in registry: {result['path']}")
         print()
 
     elif args.command == "list":
-        envs = manager.list_environments()
+        try:
+            envs = client.list_environments()
+        except RuntimeError as e:
+            if getattr(args, 'json', False):
+                print(json.dumps({"error": str(e)}))
+            else:
+                print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
 
         # Sort: conda global first, then conda local, uv, venv; by name within each
         def sort_key(e):
@@ -520,8 +696,7 @@ def main():
 
     elif args.command == "scan":
         scan_path = os.path.abspath(args.path)
-        # Use configured depth if not specified via CLI
-        depth = args.depth if args.depth is not None else manager.scan_depth
+        depth = args.depth  # None means use server default
         dry_run = getattr(args, 'no_update', False)
         json_output = getattr(args, 'json', False)
 
@@ -531,10 +706,10 @@ def main():
         try:
             if spinner:
                 spinner.start()
-            result = manager.scan_environments(scan_path, max_depth=depth, dry_run=dry_run)
+            result = client.scan_environments(scan_path, depth=depth, dry_run=dry_run)
             if spinner:
                 spinner.stop()
-        except ValueError as e:
+        except RuntimeError as e:
             if spinner:
                 spinner.stop()
             if json_output:
@@ -618,49 +793,6 @@ def main():
                         parts.append(f"{total_remove} removed")
                     summary = f"Summary: {', '.join(parts)}"
                 print(summary)
-            print()
-
-    elif args.command == "config":
-        if args.action == "enable":
-            config_path, updated, message = update_jupyter_config(args.path)
-            if updated:
-                print(f"Configured: {config_path}")
-                backup_path = get_backup_path(config_path)
-                if os.path.exists(backup_path):
-                    print(f"Backup saved: {backup_path}")
-                print("Restart JupyterLab for changes to take effect.")
-            else:
-                print(f"{message}: {config_path}")
-            print()
-
-        elif args.action == "disable":
-            config_path, updated, message = remove_jupyter_config(args.path)
-            if updated:
-                if message == "Restored from backup":
-                    print(f"Restored: {config_path}")
-                else:
-                    print(f"Removed from: {config_path}")
-                print("Restart JupyterLab for changes to take effect.")
-            else:
-                print(f"{message}: {config_path}")
-            print()
-
-        elif args.action == "show":
-            config_dir = args.path or find_jupyter_config_dir()
-            config_path = os.path.join(config_dir, "jupyter_config.json")
-            print(f"Config directory: {config_dir}")
-            print(f"Config file: {config_path}")
-
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, "r") as f:
-                        config = json.load(f)
-                    manager = config.get("ServerApp", {}).get("kernel_spec_manager_class", "not set")
-                    print(f"kernel_spec_manager_class: {manager}")
-                except (json.JSONDecodeError, IOError):
-                    print("Status: Could not read config file")
-            else:
-                print("Status: Config file does not exist")
             print()
 
     else:

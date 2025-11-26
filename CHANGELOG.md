@@ -6,14 +6,17 @@
 
 ### CLI/API Harmonization
 
-- Unified sorting across CLI and JupyterLab modal: action (add/keep/remove), then type (conda/uv/venv), then name alphabetically
+- CLI uses REST API on running Jupyter server (except `config` commands)
+- Unified architecture: CLI and JupyterLab frontend share the same server-side code path
+- Consistent sorting across CLI and modal: action (add/keep/remove), then type (conda/uv/venv), then name
 - Added `sortEnvironments()` function in frontend to match CLI sort order
-- Both interfaces now display identical scan results ordering
+- Added `JupyterAPIClient` class for server discovery and authenticated requests
 
 ### Documentation
 
 - Added "Scan Output Ordering" section to NB_VENV_KERNELS_MECHANICS.md
-- Documented three-tier sort criteria with priority table
+- Updated README with unified architecture diagram showing CLI -> REST -> Manager flow
+- Documented server requirement in CLI help text
 
 ## 1.1.18
 
