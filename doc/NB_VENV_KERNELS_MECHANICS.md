@@ -51,14 +51,12 @@ Environments must be registered before discovery. Unlike nb_conda_kernels which 
 Registration methods:
 
 ```bash
-# CLI registration (requires running Jupyter server)
+# CLI registration
 nb_venv_kernels register /path/to/.venv
 
-# Directory scanning (requires running Jupyter server)
+# Directory scanning
 nb_venv_kernels scan /path/to/projects
 ```
-
-The CLI uses REST API endpoints on the running Jupyter server, ensuring consistent behavior with the JupyterLab frontend. Server discovery uses runtime files in `jupyter_runtime_dir()`.
 
 Auto-detection of uv environments via `pyvenv.cfg`:
 

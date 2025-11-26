@@ -112,5 +112,5 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 36. **Task - CLI/API harmonization docs**: Added CHANGELOG entry for 1.1.20 documenting CLI/API sorting harmonization. Added mermaid diagram to README showing unified architecture<br>
     **Result**: CHANGELOG updated with harmonization notes, README includes API architecture diagram
 
-37. **Task - CLI uses REST API**: Refactored CLI to use REST API instead of direct VEnvKernelSpecManager calls. Added JupyterAPIClient class with server discovery via runtime files, authenticated requests. CLI now requires running Jupyter server (except config commands). Updated CHANGELOG with breaking change notice, updated mechanics doc with CLI server requirement<br>
-    **Result**: Single code path - both CLI and JupyterLab frontend use same server-side logic via REST API. Ensures consistent behavior across all interfaces
+37. **Task - CLI uses REST API**: Attempted refactoring CLI to use REST API instead of direct VEnvKernelSpecManager calls. Added JupyterAPIClient class with server discovery via runtime files<br>
+    **Result**: Reverted due to JupyterHub authentication issues - runtime file tokens are for Jupyter server but JupyterHub proxy requires separate auth. CLI remains using VEnvKernelSpecManager directly
