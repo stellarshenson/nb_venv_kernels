@@ -52,6 +52,28 @@ async function scanEnvironments(): Promise<IScanResult> {
 }
 
 /**
+ * Sort environments to match CLI order: action -> type -> name
+ */
+function sortEnvironments(environments: IScanEnvironment[]): IScanEnvironment[] {
+  const actionOrder: Record<string, number> = { add: 0, keep: 1, remove: 2 };
+  const typeOrder: Record<string, number> = { conda: 0, uv: 1, venv: 2 };
+
+  return [...environments].sort((a, b) => {
+    // Sort by action first
+    const actionDiff =
+      (actionOrder[a.action] ?? 3) - (actionOrder[b.action] ?? 3);
+    if (actionDiff !== 0) return actionDiff;
+
+    // Then by type
+    const typeDiff = (typeOrder[a.type] ?? 3) - (typeOrder[b.type] ?? 3);
+    if (typeDiff !== 0) return typeDiff;
+
+    // Then by name alphabetically
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+}
+
+/**
  * Build HTML content for scan results
  */
 function buildResultsContent(result: IScanResult): string {
@@ -76,7 +98,10 @@ function buildResultsContent(result: IScanResult): string {
     return intro;
   }
 
-  const rows = result.environments
+  // Sort environments to match CLI order
+  const sortedEnvs = sortEnvironments(result.environments);
+
+  const rows = sortedEnvs
     .map(env => {
       let actionStyle = '';
       if (env.action === 'add') {
@@ -102,14 +127,15 @@ function buildResultsContent(result: IScanResult): string {
     .join('');
 
   const summaryParts = [];
+  // Use past tense since scan has completed
   if (result.summary.add > 0) {
-    summaryParts.push(`${result.summary.add} add`);
+    summaryParts.push(`${result.summary.add} added`);
   }
   if (result.summary.keep > 0) {
-    summaryParts.push(`${result.summary.keep} keep`);
+    summaryParts.push(`${result.summary.keep} kept`);
   }
   if (result.summary.remove > 0) {
-    summaryParts.push(`${result.summary.remove} remove`);
+    summaryParts.push(`${result.summary.remove} removed`);
   }
 
   // Check if any environments are missing a kernel

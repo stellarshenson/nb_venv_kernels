@@ -242,6 +242,18 @@ Kernels are sorted by priority:
 
 Within each priority, kernels sort alphabetically by name.
 
+## Scan Output Ordering
+
+The `scan` command output (CLI and JupyterLab modal) sorts environments by three criteria:
+
+| Priority | Field | Order |
+|----------|-------|-------|
+| 1 | Action | add (0), keep (1), remove (2) |
+| 2 | Type | conda (0), uv (1), venv (2) |
+| 3 | Name | Alphabetical (case-insensitive) |
+
+This ordering groups new environments first, then existing, then those scheduled for removal - with consistent type ordering within each action group.
+
 ## Caching Strategy
 
 Single-level caching with 60-second TTL:

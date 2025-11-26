@@ -30,6 +30,7 @@ from .registry import (
     register_environment,
     unregister_environment,
     _check_has_kernel,
+    get_conda_environments,
 )
 
 CACHE_TIMEOUT = 60
@@ -442,9 +443,11 @@ class VEnvKernelSpecManager(KernelSpecManager):
         path = abspath(path)
         result = scan_directory(path, max_depth=max_depth, dry_run=dry_run)
 
-        def get_env_info(env_path, env_type, action):
+        def get_env_info(env_path, env_type, action, exists=None):
             """Build environment info dict with exists and has_kernel."""
-            exists = os.path.isdir(env_path)
+            # Trust exists parameter if provided (environment was just found)
+            if exists is None:
+                exists = os.path.isdir(env_path)
             kernel_path = join(env_path, "share", "jupyter", "kernels")
             has_kernel = _check_has_kernel(kernel_path) if exists else False
             return {
@@ -458,17 +461,29 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
         # Build environment list with actions
         environments = []
+        seen_paths = set()
 
+        # Environments found during scan - they exist (we just found them)
         for env_path in result["registered"]:
             env_type = "uv" if is_uv_environment(env_path) else "venv"
-            environments.append(get_env_info(env_path, env_type, "add"))
+            environments.append(get_env_info(env_path, env_type, "add", exists=True))
+            seen_paths.add(env_path)
 
         for env_path in result["skipped"]:
             env_type = "uv" if is_uv_environment(env_path) else "venv"
-            environments.append(get_env_info(env_path, env_type, "keep"))
+            environments.append(get_env_info(env_path, env_type, "keep", exists=True))
+            seen_paths.add(env_path)
 
         for env_path in result["conda_found"]:
-            environments.append(get_env_info(env_path, "conda", "keep"))
+            environments.append(get_env_info(env_path, "conda", "keep", exists=True))
+            seen_paths.add(env_path)
+
+        # Add global conda environments not in scan path
+        global_conda_count = 0
+        for env_path in get_conda_environments():
+            if env_path not in seen_paths:
+                environments.append(get_env_info(env_path, "conda", "keep"))
+                global_conda_count += 1
 
         for item in result["not_available"]:
             environments.append({
@@ -489,7 +504,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
             "environments": environments,
             "summary": {
                 "add": len(result["registered"]),
-                "keep": len(result["skipped"]) + len(result["conda_found"]),
+                "keep": len(result["skipped"]) + len(result["conda_found"]) + global_conda_count,
                 "remove": len(result["not_available"]),
             },
             "dry_run": dry_run,

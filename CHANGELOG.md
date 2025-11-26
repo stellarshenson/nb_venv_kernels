@@ -2,6 +2,19 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.1.20
+
+### CLI/API Harmonization
+
+- Unified sorting across CLI and JupyterLab modal: action (add/keep/remove), then type (conda/uv/venv), then name alphabetically
+- Added `sortEnvironments()` function in frontend to match CLI sort order
+- Both interfaces now display identical scan results ordering
+
+### Documentation
+
+- Added "Scan Output Ordering" section to NB_VENV_KERNELS_MECHANICS.md
+- Documented three-tier sort criteria with priority table
+
 ## 1.1.18
 
 ### CI/CD and Testing

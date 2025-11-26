@@ -105,3 +105,9 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 34. **Task - Tier 2 tests and fixes**: Fixed comprehensive integration test suite. Added cache invalidation in test_manager.py after register_environment() calls. Fixed test_registry.py scan_directory return keys (changed "found"/"added" to "registered"). Fixed `_read_registry_file` with `include_missing` parameter so `list_environments()` shows non-existent entries with exists=False. Made conda env creation test skip on timing issues instead of failing. Added PayPal donation badge to README and workspace CLAUDE.md badge template<br>
     **Result**: 49 tests passing (1 skipped for conda timing), all registry and manager tests functional
+
+35. **Task - Modal sorting alignment**: Added sortEnvironments() function in index.ts to match CLI sort order. Updated NB_VENV_KERNELS_MECHANICS.md with new "Scan Output Ordering" section documenting the three-tier sort criteria<br>
+    **Result**: Modal now sorts environments by action (add/keep/remove), then type (conda/uv/venv), then name alphabetically - identical to CLI behavior
+
+36. **Task - CLI/API harmonization docs**: Added CHANGELOG entry for 1.1.20 documenting CLI/API sorting harmonization. Added mermaid diagram to README showing CLI -> Manager and Menu -> REST -> Manager architecture<br>
+    **Result**: CHANGELOG updated with harmonization notes, README includes API architecture diagram showing both access paths converge on VEnvKernelSpecManager

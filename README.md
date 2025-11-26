@@ -203,6 +203,39 @@ The extension provides REST and Python APIs for integration with tools and autom
 - **Python API** - VEnvKernelSpecManager methods for listing, scanning, and registering environments
 - **JSON output** - CLI commands support `--json` flag for machine-to-machine communication
 
+```mermaid
+flowchart TB
+    subgraph Interfaces
+        CLI[nb_venv_kernels CLI]
+        MENU[JupyterLab Kernel Menu]
+    end
+
+    subgraph API
+        REST[REST Endpoints<br>/nb-venv-kernels/*]
+        MGR[VEnvKernelSpecManager]
+    end
+
+    subgraph Storage
+        VENV_REG[~/.venv/environments.txt]
+        UV_REG[~/.uv/environments.txt]
+    end
+
+    CLI --> MGR
+    MENU --> REST
+    REST --> MGR
+    MGR --> VENV_REG
+    MGR --> UV_REG
+
+    style CLI stroke:#10b981,stroke-width:2px
+    style MENU stroke:#0284c7,stroke-width:2px
+    style REST stroke:#f59e0b,stroke-width:2px
+    style MGR stroke:#3b82f6,stroke-width:3px
+    style VENV_REG stroke:#10b981,stroke-width:2px
+    style UV_REG stroke:#a855f7,stroke-width:2px
+```
+
+CLI calls VEnvKernelSpecManager methods directly. JupyterLab frontend calls REST endpoints which delegate to the same manager. Both interfaces produce identical sorted output.
+
 ## Uninstall
 
 ```bash
