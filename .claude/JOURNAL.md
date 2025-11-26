@@ -93,3 +93,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 30. **Task - UI harmonization**: Standardized "no" indicator across CLI and frontend. Previously inconsistent (uppercase "NO" for exists, lowercase "no" for kernel). Now uniformly lowercase "no" displayed in red - ANSI red (\033[31m) in terminal, #ef4444 in modal. Added Colors.red() helper method with proper 6-space padding to compensate for invisible ANSI escape sequences in column alignment. Updated README example output to match current format (lowercase headers, "conda" without "(global)")<br>
     **Result**: Consistent visual feedback highlighting missing environments and kernels
+
+31. **Task - README screenshots**: Added three new screenshots to README documentation. CLI list command output showing environment table with color-coded status (screenshot-cli.png). Kernel menu showing "Scan for Python Environments" command (screenshot-menu.png). Scan results modal displaying action table with exists/kernel columns (screenshot-modal.png). Updated text to reference JupyterLab menu integration<br>
+    **Result**: Visual documentation of CLI and frontend features

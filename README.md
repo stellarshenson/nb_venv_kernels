@@ -89,6 +89,8 @@ another-project           venv             yes      no       /home/user/another-
 
 Environments are sorted by type (conda, uv, venv) then by name. The KERNEL column indicates whether `ipykernel` is installed. Missing environments and kernels display "no" in red.
 
+![CLI list command output](.resources/screenshot-cli.png)
+
 ### Jupyter Configuration
 
 ```bash
@@ -97,7 +99,11 @@ nb_venv_kernels config disable    # Disable VEnvKernelSpecManager
 nb_venv_kernels config show       # Show current config status
 ```
 
-Registered environments with ipykernel appear in JupyterLab's kernel selector.
+Registered environments with ipykernel appear in JupyterLab's kernel selector. Use the Kernel menu to scan for environments directly from JupyterLab.
+
+![Kernel menu with scan command](.resources/screenshot-menu.png)
+
+![Scan results modal](.resources/screenshot-modal.png)
 
 ## Environment Registries
 
