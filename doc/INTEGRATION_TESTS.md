@@ -59,9 +59,9 @@ Tests for VEnvKernelSpecManager kernel discovery functionality.
 - `test_uv_environment_detection` - Verifies uv environments detected via pyvenv.cfg
 - `test_uv_kernel_discovery` - Creates uv venv, installs ipykernel, verifies discovery
 
-**TestCondaKernelDiscovery** (skips if conda unavailable)
+**TestCondaKernelDiscovery** (skips if conda unavailable or timing issues)
 - `test_conda_base_discovery` - Verifies base conda environment discovery
-- `test_conda_env_creation_and_discovery` - Creates conda env with ipykernel, verifies discovery
+- `test_conda_env_creation_and_discovery` - Creates conda env with ipykernel, verifies discovery (skips if conda indexing delayed)
 
 **TestMixedEnvironments**
 - `test_multiple_environments` - Creates and discovers multiple venvs simultaneously
@@ -151,10 +151,12 @@ Common fixtures used across test files:
 | Fixture | Description |
 |---------|-------------|
 | temp_dir | Creates temporary directory, cleans up after test |
-| manager | Fresh VEnvKernelSpecManager instance |
+| manager | Fresh VEnvKernelSpecManager instance with cleared cache |
 | jp_fetch | Jupyter server fetch function (from jupyter_server) |
 | uv_available | Skips test if uv not installed |
 | conda_available | Skips test if conda not available or times out |
+
+Helper function `invalidate_cache(manager)` clears the manager's kernel cache after `register_environment()` calls to ensure newly registered environments are discovered by `find_kernel_specs()`.
 
 ## Environment Requirements
 
