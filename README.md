@@ -32,13 +32,21 @@ nb_venv_kernels config show       # Show current config status
 
 Registered environments with ipykernel appear in JupyterLab's kernel selector.
 
+## Environment Registries
+
+Environments are registered in separate files based on their source:
+
+- **venv**: `~/.venv/environments.txt`
+- **uv**: `~/.uv/environments.txt`
+- **conda**: `~/.conda/environments.txt` + global environments from `conda env list`
+
+The `register` command auto-detects uv environments via `pyvenv.cfg` and writes to the appropriate registry.
+
 ## How It Works
 
-- **venv environments**: Registry at `~/.venv/environments.txt`
-- **uv environments**: Registry at `~/.uv/environments.txt`, auto-detected via `pyvenv.cfg`
-- **conda environments**: Discovers via `CondaKernelSpecManager` if nb_conda_kernels is installed
 - Scans `{path}/share/jupyter/kernels/*/kernel.json` for each registered environment
 - Configures kernel to use venv's python directly with `VIRTUAL_ENV` and `PATH` environment variables
+- Kernel order: current environment first, then conda, uv, venv, system
 - Caches results for 60 seconds
 - `config enable` backs up existing config, `config disable` restores from backup
 
