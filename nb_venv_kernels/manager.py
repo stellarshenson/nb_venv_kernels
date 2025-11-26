@@ -38,6 +38,84 @@ CACHE_TIMEOUT = 60
 RUNNER_COMMAND = ["python", "-m", "nb_venv_kernels.runner"]
 
 
+def get_workspace_root():
+    """Get the workspace/server root directory.
+
+    Reads from Jupyter server config or environment variables:
+    1. JUPYTER_SERVER_ROOT environment variable
+    2. ServerApp.root_dir from jupyter_server_config
+    3. JUPYTERHUB_ROOT_DIR environment variable
+    4. Falls back to current working directory
+    """
+    # Check environment variable first
+    for var in ['JUPYTER_SERVER_ROOT', 'JUPYTERHUB_ROOT_DIR']:
+        root = os.environ.get(var)
+        if root and os.path.isdir(root):
+            return os.path.abspath(root)
+
+    # Try to read from Jupyter server config
+    try:
+        from jupyter_core.paths import jupyter_config_dir
+        import json as json_module
+
+        config_dir = jupyter_config_dir()
+        config_file = os.path.join(config_dir, "jupyter_server_config.json")
+        if os.path.exists(config_file):
+            with open(config_file, "r") as f:
+                config = json_module.load(f)
+            root_dir = config.get("ServerApp", {}).get("root_dir")
+            if root_dir and os.path.isdir(root_dir):
+                return os.path.abspath(root_dir)
+    except Exception:
+        pass
+
+    return os.getcwd()
+
+
+def path_relative_to_workspace(path: str, workspace: str = None) -> str:
+    """Convert absolute path to path relative to workspace.
+
+    Args:
+        path: Absolute path to convert
+        workspace: Workspace root (auto-detected if None)
+
+    Returns:
+        Relative path string, or absolute path if outside workspace
+    """
+    if workspace is None:
+        workspace = get_workspace_root()
+
+    try:
+        abs_path = os.path.abspath(path)
+        abs_workspace = os.path.abspath(workspace)
+        if abs_path.startswith(abs_workspace + os.sep) or abs_path == abs_workspace:
+            return os.path.relpath(abs_path, abs_workspace)
+    except ValueError:
+        pass
+    return path
+
+
+def is_path_within_workspace(path: str, workspace: str = None) -> bool:
+    """Check if path is within the workspace.
+
+    Args:
+        path: Path to check
+        workspace: Workspace root (auto-detected if None)
+
+    Returns:
+        True if path is within workspace
+    """
+    if workspace is None:
+        workspace = get_workspace_root()
+
+    try:
+        abs_path = os.path.abspath(path)
+        abs_workspace = os.path.abspath(workspace)
+        return abs_path.startswith(abs_workspace + os.sep) or abs_path == abs_workspace
+    except ValueError:
+        return False
+
+
 class VEnvKernelSpecManager(KernelSpecManager):
     """A KernelSpecManager that discovers kernels from registered venv environments.
 

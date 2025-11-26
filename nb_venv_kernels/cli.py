@@ -7,7 +7,12 @@ import sys
 import threading
 import time
 
-from .manager import VEnvKernelSpecManager
+from .manager import (
+    VEnvKernelSpecManager,
+    get_workspace_root,
+    is_path_within_workspace,
+    path_relative_to_workspace,
+)
 
 
 class Colors:
@@ -122,22 +127,19 @@ def _get_env_type_display(env_path: str, env_type: str) -> str:
     return env_type
 
 
-def _relative_path(path: str, base: str = None) -> str:
-    """Convert absolute path to relative path for display."""
-    from pathlib import Path
-    if base is None:
-        base = Path.cwd()
-    else:
-        base = Path(base)
-    try:
-        return str(Path(path).relative_to(base.resolve()))
-    except ValueError:
-        # Path is not relative to base, use os.path.relpath as fallback
-        try:
-            return os.path.relpath(path, str(base))
-        except ValueError:
-            # On Windows, relpath fails for paths on different drives
-            return path
+def _relative_path(path: str, workspace: str = None) -> str:
+    """Convert absolute path to path relative to workspace.
+
+    Args:
+        path: Path to convert
+        workspace: Workspace root (auto-detected if None)
+
+    Returns:
+        Relative path string
+    """
+    if workspace is None:
+        workspace = get_workspace_root()
+    return path_relative_to_workspace(path, workspace)
 
 
 def find_jupyter_config_dir():
@@ -486,8 +488,10 @@ def main():
 
         envs.sort(key=sort_key)
 
+        workspace = get_workspace_root()
+
         if getattr(args, 'json', False):
-            # JSON output
+            # JSON output with workspace-relative paths
             output = []
             for env in envs:
                 output.append({
@@ -495,31 +499,38 @@ def main():
                     "type": _get_env_type_display(env['path'], env.get("type", "venv")),
                     "exists": env["exists"],
                     "has_kernel": env["has_kernel"],
-                    "path": env["path"],
+                    "path": _relative_path(env["path"], workspace),
                 })
-            print(json.dumps(output, indent=2))
+            print(json.dumps({"environments": output, "workspace_root": workspace}, indent=2))
         elif not envs:
             print("No environments found.")
             print("Use 'nb_venv_kernels register <path>' or 'nb_venv_kernels scan' to add environments.")
         else:
             print()
-            print(f"{'name':<25} {'type':<16} {'exists':<8} {'kernel':<8} {'path'}")
+            print(f"{'name':<25} {'type':<16} {'exists':<8} {'kernel':<8} {'path (relative to workspace)'}")
             print("-" * 110)
             for env in envs:
                 name = _get_env_display_name(env['path'], env.get("type", "venv"))
                 env_type = _get_env_type_display(env['path'], env.get("type", "venv"))
                 exists = "yes" if env["exists"] else Colors.red("no") + " " * 6
                 kernel = "yes" if env["has_kernel"] else Colors.red("no") + " " * 6
-                # Use relative path except for conda global
+                # Use workspace-relative path except for conda global
                 if env.get("type") == "conda" and _is_conda_global(env['path']):
                     display_path = env['path']
                 else:
-                    display_path = _relative_path(env['path'])
+                    display_path = _relative_path(env['path'], workspace)
                 print(f"{name:<25} {env_type:<16} {exists:<8} {kernel:<8} {display_path}")
         print()
 
     elif args.command == "scan":
+        workspace = get_workspace_root()
         scan_path = os.path.abspath(args.path)
+
+        # Validate scan path is within workspace
+        if not is_path_within_workspace(scan_path, workspace):
+            print(f"Error: Scan path must be within workspace: {workspace}", file=sys.stderr)
+            sys.exit(1)
+
         # Use configured depth if not specified via CLI
         depth = args.depth if args.depth is not None else manager.scan_depth
         dry_run = getattr(args, 'no_update', False)
@@ -571,28 +582,31 @@ def main():
         total_remove = result["summary"]["remove"]
 
         if json_output:
-            # Output result directly - manager already builds the right structure
+            # Output with workspace-relative paths
+            for env in environments:
+                env["path"] = _relative_path(env["path"], workspace)
             output = {
                 "environments": environments,
                 "summary": result["summary"],
                 "dry_run": dry_run,
+                "workspace_root": workspace,
             }
             print(json.dumps(output, indent=2))
         else:
             if environments:
                 print()
-                print(f"{'action':<10} {'name':<25} {'type':<16} {'exists':<8} {'kernel':<8} {'path'}")
+                print(f"{'action':<10} {'name':<25} {'type':<16} {'exists':<8} {'kernel':<8} {'path (relative to workspace)'}")
                 print("-" * 130)
                 for env in environments:
                     # Pad action before colorizing to maintain alignment
                     action_colored = colorize_action(env["action"]) + " " * (10 - len(env["action"]))
                     exists_str = "yes" if env["exists"] else Colors.red("no") + " " * 6
                     kernel_str = "yes" if env["has_kernel"] else Colors.red("no") + " " * 6
-                    # Use relative path except for conda global
+                    # Use workspace-relative path except for conda global
                     if env["type"] == "conda" and _is_conda_global(env["path"]):
                         display_path = env["path"]
                     else:
-                        display_path = _relative_path(env["path"])
+                        display_path = _relative_path(env["path"], workspace)
                     print(f"{action_colored} {env['name']:<25} {env['type']:<16} {exists_str:<8} {kernel_str:<8} {display_path}")
                 print()
 

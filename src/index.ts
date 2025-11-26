@@ -26,6 +26,7 @@ interface IScanResult {
     remove: number;
   };
   dry_run: boolean;
+  workspace_root: string;
 }
 
 /**
@@ -154,7 +155,7 @@ function buildResultsContent(result: IScanResult): string {
           <th style="text-align: left; padding: 4px 8px;">type</th>
           <th style="text-align: left; padding: 4px 8px;">exists</th>
           <th style="text-align: left; padding: 4px 8px;">kernel</th>
-          <th style="text-align: left; padding: 4px 8px;">path</th>
+          <th style="text-align: left; padding: 4px 8px;">path (relative to workspace)</th>
         </tr>
       </thead>
       <tbody>
