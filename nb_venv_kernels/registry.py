@@ -5,7 +5,9 @@ Manages two registry files:
 - ~/.venv/environments.txt for venv environments
 - ~/.uv/environments.txt for uv environments
 """
+import json
 import os
+import subprocess
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict
 
@@ -180,7 +182,6 @@ def get_conda_environments() -> List[str]:
 
     # Try conda env list
     try:
-        import subprocess
         result = subprocess.run(
             ["conda", "env", "list", "--json"],
             capture_output=True,
@@ -188,7 +189,6 @@ def get_conda_environments() -> List[str]:
             timeout=10
         )
         if result.returncode == 0:
-            import json
             data = json.loads(result.stdout)
             for env_path in data.get("envs", []):
                 if env_path not in seen:
