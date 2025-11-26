@@ -9,7 +9,21 @@
 
 Use Python virtual environments as Jupyter kernels. Discovers and registers kernels from venv, uv, and conda environments in JupyterLab's kernel selector.
 
+Discovered environments appear in JupyterLab's kernel selector.
+
 ![UV and Conda virtual environments co-exist and are properly discovered](.resources/screenshot.png)
+
+CLI provides environment listing with status indicators.
+
+![CLI list command](.resources/screenshot-cli.png)
+
+Scan for environments directly from JupyterLab's Kernel menu.
+
+![Kernel menu scan command](.resources/screenshot-menu.png)
+
+Results display in a modal with action indicators.
+
+![Scan results modal](.resources/screenshot-modal.png)
 
 ## Features
 
@@ -20,10 +34,6 @@ Use Python virtual environments as Jupyter kernels. Discovers and registers kern
 - **Directory scanning** - scan project directories to find and register environments
 - **CLI management** - register, unregister, scan, list (all env types), and configure
 - **Zero config** - auto-enables on install, works immediately
-
-![CLI list command](.resources/screenshot-cli.png)
-![Kernel menu scan command](.resources/screenshot-menu.png)
-![Scan results modal](.resources/screenshot-modal.png)
 
 ## Install
 
