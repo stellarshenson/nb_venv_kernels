@@ -100,13 +100,13 @@ function buildResultsContent(result: IScanResult): string {
 
   const summaryParts = [];
   if (result.summary.add > 0) {
-    summaryParts.push(`${result.summary.add} added`);
+    summaryParts.push(`${result.summary.add} add`);
   }
   if (result.summary.keep > 0) {
-    summaryParts.push(`${result.summary.keep} kept`);
+    summaryParts.push(`${result.summary.keep} keep`);
   }
   if (result.summary.remove > 0) {
-    summaryParts.push(`${result.summary.remove} removed`);
+    summaryParts.push(`${result.summary.remove} remove`);
   }
 
   // Check if any environments are missing a kernel
@@ -120,12 +120,12 @@ function buildResultsContent(result: IScanResult): string {
     <table style="border-collapse: collapse; width: 100%; margin-top: 8px;">
       <thead>
         <tr style="border-bottom: 1px solid var(--jp-border-color1);">
-          <th style="text-align: left; padding: 4px 8px;">Action</th>
-          <th style="text-align: left; padding: 4px 8px;">Name</th>
-          <th style="text-align: left; padding: 4px 8px;">Type</th>
-          <th style="text-align: left; padding: 4px 8px;">Exists</th>
-          <th style="text-align: left; padding: 4px 8px;">Kernel</th>
-          <th style="text-align: left; padding: 4px 8px;">Path</th>
+          <th style="text-align: left; padding: 4px 8px;">action</th>
+          <th style="text-align: left; padding: 4px 8px;">name</th>
+          <th style="text-align: left; padding: 4px 8px;">type</th>
+          <th style="text-align: left; padding: 4px 8px;">exists</th>
+          <th style="text-align: left; padding: 4px 8px;">kernel</th>
+          <th style="text-align: left; padding: 4px 8px;">path</th>
         </tr>
       </thead>
       <tbody>
