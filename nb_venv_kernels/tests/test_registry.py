@@ -221,8 +221,9 @@ class TestDirectoryScanning:
         # Scan with dry_run
         result = scan_directory(temp_dir, max_depth=3, dry_run=True)
 
-        assert "found" in result
-        assert venv_path in result["found"]
+        # In dry_run mode, new environments go to "registered" list
+        assert "registered" in result
+        assert venv_path in result["registered"]
 
     def test_scan_depth_limit(self, temp_dir):
         """Test that scan respects depth limit."""
@@ -235,14 +236,14 @@ class TestDirectoryScanning:
         # Scan with low depth
         result = scan_directory(temp_dir, max_depth=2, dry_run=True)
 
-        # Should not find the deeply nested venv
-        assert venv_path not in result.get("found", [])
+        # Should not find the deeply nested venv (at depth 6)
+        assert venv_path not in result.get("registered", [])
 
         # Scan with higher depth
         result = scan_directory(temp_dir, max_depth=7, dry_run=True)
 
         # Should find it now
-        assert venv_path in result["found"]
+        assert venv_path in result["registered"]
 
     def test_scan_registers_environments(self, temp_dir):
         """Test that scan registers found environments."""
@@ -254,7 +255,7 @@ class TestDirectoryScanning:
         # Scan without dry_run
         result = scan_directory(temp_dir, max_depth=3, dry_run=False)
 
-        assert venv_path in result["added"]
+        assert venv_path in result["registered"]
 
         # Should now be in registry
         envs = read_environments()

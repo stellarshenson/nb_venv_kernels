@@ -56,8 +56,13 @@ def is_uv_environment(env_path: str) -> bool:
     return False
 
 
-def _read_registry_file(registry_path: Path) -> List[str]:
-    """Read environments from a single registry file."""
+def _read_registry_file(registry_path: Path, include_missing: bool = False) -> List[str]:
+    """Read environments from a single registry file.
+
+    Args:
+        registry_path: Path to the registry file
+        include_missing: If True, include paths that don't exist on disk
+    """
     if not registry_path.exists():
         return []
 
@@ -67,7 +72,7 @@ def _read_registry_file(registry_path: Path) -> List[str]:
             line = line.strip()
             if line and not line.startswith("#"):
                 env_path = os.path.abspath(os.path.expanduser(line))
-                if os.path.isdir(env_path):
+                if include_missing or os.path.isdir(env_path):
                     environments.append(env_path)
 
     return environments
@@ -226,7 +231,7 @@ def list_environments() -> List[dict]:
     seen = set()
 
     # Get venv environments from ~/.venv/environments.txt
-    for env_path in _read_registry_file(get_venv_registry_path()):
+    for env_path in _read_registry_file(get_venv_registry_path(), include_missing=True):
         if env_path in seen:
             continue
         seen.add(env_path)
@@ -240,7 +245,7 @@ def list_environments() -> List[dict]:
         })
 
     # Get uv environments from ~/.uv/environments.txt
-    for env_path in _read_registry_file(get_uv_registry_path()):
+    for env_path in _read_registry_file(get_uv_registry_path(), include_missing=True):
         if env_path in seen:
             continue
         seen.add(env_path)
