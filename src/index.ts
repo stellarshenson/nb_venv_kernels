@@ -57,16 +57,19 @@ async function scanEnvironments(): Promise<IScanResult> {
 function buildResultsContent(result: IScanResult): string {
   // Build intro message
   const total = result.environments.length;
-  const existing = result.environments.filter(e => e.exists).length;
-  const missing = result.summary.remove;
+  const added = result.summary.add;
+  const kept = result.summary.keep;
+  const removed = result.summary.remove;
 
   let intro: string;
   if (total === 0) {
-    intro = '<p>No Python environments were found in the workspace.</p>';
-  } else if (missing > 0) {
-    intro = `<p>Found ${existing} environment${existing !== 1 ? 's' : ''}, ${missing} missing will be removed.</p>`;
+    intro = '<p>No environments found.</p>';
   } else {
-    intro = `<p>Found ${total} Python environment${total !== 1 ? 's' : ''}.</p>`;
+    const parts = [];
+    if (added > 0) parts.push(`${added} new`);
+    if (kept > 0) parts.push(`${kept} kept`);
+    if (removed > 0) parts.push(`${removed} missing`);
+    intro = `<p>Found ${total} environment${total !== 1 ? 's' : ''}: ${parts.join(', ')}.</p>`;
   }
 
   if (result.environments.length === 0) {
