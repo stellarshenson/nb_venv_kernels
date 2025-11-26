@@ -2,6 +2,16 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.0.8
+
+- Separate registries: `~/.venv/environments.txt` for venv, `~/.uv/environments.txt` for uv
+- Auto-detect uv environments via `pyvenv.cfg` on register
+- Kernel ordering: current environment first, then conda, uv, venv, system (alphabetical within groups)
+- Add standard badges to README (GitHub Actions, npm, PyPI, downloads, JupyterLab 4)
+- Add Features section to README
+- Add link to nb_conda_kernels in README
+- Improve README description
+
 ## 1.0.4
 
 - Add screenshot to README showing kernel selector with UV and conda environments
