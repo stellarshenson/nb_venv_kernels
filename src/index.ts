@@ -206,7 +206,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
   autoStart: true,
   optional: [IMainMenu],
   activate: (app: JupyterFrontEnd, mainMenu: IMainMenu | null) => {
-    console.log('nb_venv_kernels: VEnvKernelSpecManager active');
+    console.log('JupyterLab extension nb_venv_kernels is activated!');
 
     // Add command to scan environments
     const commandId = 'nb_venv_kernels:scan';
