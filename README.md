@@ -1,5 +1,12 @@
 # nb_venv_kernels
 
+[![GitHub Actions](https://github.com/stellarshenson/nb_venv_kernels/actions/workflows/build.yml/badge.svg)](https://github.com/stellarshenson/nb_venv_kernels/actions/workflows/build.yml)
+[![npm version](https://img.shields.io/npm/v/nb_venv_kernels.svg)](https://www.npmjs.com/package/nb_venv_kernels)
+[![PyPI version](https://img.shields.io/pypi/v/nb_venv_kernels.svg)](https://pypi.org/project/nb_venv_kernels/)
+[![Total PyPI downloads](https://static.pepy.tech/badge/nb_venv_kernels)](https://pepy.tech/project/nb_venv_kernels)
+[![JupyterLab 4](https://img.shields.io/badge/JupyterLab-4-orange.svg)](https://jupyterlab.readthedocs.io/en/stable/)
+[![Brought To You By KOLOMOLO](https://img.shields.io/badge/Brought%20To%20You%20By-KOLOMOLO-00ffff?style=flat)](https://kolomolo.com)
+
 Composite Jupyter kernel spec manager that discovers kernels from conda, venv and uv Python environments. Combines functionality of nb_conda_kernels with venv/uv environment discovery.
 
 ![UV and Conda virtual environments co-exist and are properly discovered](.resources/screenshot.png)
