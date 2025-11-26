@@ -22,7 +22,15 @@ except ImportError:
     CondaKernelSpecManager = None
     _HAS_CONDA = False
 
-from .registry import read_environments, is_uv_environment
+from .registry import (
+    read_environments,
+    is_uv_environment,
+    list_environments as _list_environments,
+    scan_directory,
+    register_environment,
+    unregister_environment,
+    _check_has_kernel,
+)
 
 CACHE_TIMEOUT = 60
 
@@ -366,3 +374,178 @@ class VEnvKernelSpecManager(KernelSpecManager):
             except NoSuchKernel:
                 self.log.warning("Error loading kernelspec %r", name, exc_info=True)
         return res
+
+    # --- API methods for programmatic access ---
+
+    def list_environments(self):
+        """List all registered environments with their status.
+
+        Returns:
+            List of dicts with keys: name, type, exists, has_kernel, path
+        """
+        envs = _list_environments()
+
+        # Add display name
+        result = []
+        for env in envs:
+            env_type = env.get("type", "venv")
+            path = env["path"]
+
+            # Derive display name
+            env_dir = basename(path)
+            if env_dir in (".venv", "venv", ".env", "env"):
+                name = basename(dirname(path))
+            elif env_type == "conda" and env_dir.lower() in (
+                "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
+                "miniforge", "miniforge3", "mambaforge", "mambaforge3"
+            ):
+                name = "base"
+            else:
+                name = env_dir
+
+            # Determine type display
+            if env_type == "conda":
+                if env_dir.lower() in (
+                    "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
+                    "miniforge", "miniforge3", "mambaforge", "mambaforge3"
+                ):
+                    type_display = "conda"
+                else:
+                    type_display = "conda (local)"
+            else:
+                type_display = env_type
+
+            result.append({
+                "name": name,
+                "type": type_display,
+                "exists": env["exists"],
+                "has_kernel": env["has_kernel"],
+                "path": path,
+            })
+
+        return result
+
+    def scan_environments(self, path=".", max_depth=None, dry_run=False):
+        """Scan directory for environments and register them.
+
+        Args:
+            path: Directory to scan (default: current directory)
+            max_depth: Maximum depth to recurse (default: from config)
+            dry_run: If True, only report without making changes
+
+        Returns:
+            Dict with keys: environments (list), summary (dict), dry_run (bool)
+        """
+        if max_depth is None:
+            max_depth = self.scan_depth
+
+        path = abspath(path)
+        result = scan_directory(path, max_depth=max_depth, dry_run=dry_run)
+
+        def get_env_info(env_path, env_type, action):
+            """Build environment info dict with exists and has_kernel."""
+            exists = os.path.isdir(env_path)
+            kernel_path = join(env_path, "share", "jupyter", "kernels")
+            has_kernel = _check_has_kernel(kernel_path) if exists else False
+            return {
+                "action": action,
+                "name": self._get_env_display_name(env_path, env_type),
+                "type": env_type,
+                "exists": exists,
+                "has_kernel": has_kernel,
+                "path": env_path,
+            }
+
+        # Build environment list with actions
+        environments = []
+
+        for env_path in result["registered"]:
+            env_type = "uv" if is_uv_environment(env_path) else "venv"
+            environments.append(get_env_info(env_path, env_type, "add"))
+
+        for env_path in result["skipped"]:
+            env_type = "uv" if is_uv_environment(env_path) else "venv"
+            environments.append(get_env_info(env_path, env_type, "keep"))
+
+        for env_path in result["conda_found"]:
+            environments.append(get_env_info(env_path, "conda", "keep"))
+
+        for item in result["not_available"]:
+            environments.append({
+                "action": "remove",
+                "name": self._get_env_display_name(item["path"], item["type"]),
+                "type": item["type"],
+                "exists": False,
+                "has_kernel": False,
+                "path": item["path"],
+            })
+
+        # Invalidate cache after scan (if not dry run)
+        if not dry_run:
+            self._venv_kernels_cache = None
+            self._venv_kernels_cache_expiry = None
+
+        return {
+            "environments": environments,
+            "summary": {
+                "add": len(result["registered"]),
+                "keep": len(result["skipped"]) + len(result["conda_found"]),
+                "remove": len(result["not_available"]),
+            },
+            "dry_run": dry_run,
+        }
+
+    def register_environment(self, path):
+        """Register an environment for kernel discovery.
+
+        Args:
+            path: Path to the environment directory
+
+        Returns:
+            Dict with keys: path, registered (bool), error (str or None)
+        """
+        path = abspath(path)
+        try:
+            registered = register_environment(path)
+            # Invalidate cache
+            self._venv_kernels_cache = None
+            self._venv_kernels_cache_expiry = None
+            return {"path": path, "registered": registered, "error": None}
+        except ValueError as e:
+            return {"path": path, "registered": False, "error": str(e)}
+
+    def unregister_environment(self, path):
+        """Remove an environment from kernel discovery.
+
+        Args:
+            path: Path to the environment directory
+
+        Returns:
+            Dict with keys: path, unregistered (bool)
+        """
+        path = abspath(path)
+        unregistered = unregister_environment(path)
+        if unregistered:
+            # Invalidate cache
+            self._venv_kernels_cache = None
+            self._venv_kernels_cache_expiry = None
+        return {"path": path, "unregistered": unregistered}
+
+    def _get_env_display_name(self, env_path, env_type):
+        """Get display name for an environment."""
+        env_dir = basename(env_path)
+
+        if env_type in ("venv", "uv"):
+            if env_dir in (".venv", "venv", ".env", "env", ".virtualenv", "virtualenv"):
+                return basename(dirname(env_path))
+            return env_dir
+
+        if env_type == "conda":
+            if env_dir.lower() in (
+                "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
+                "miniforge", "miniforge3", "mambaforge", "mambaforge3"
+            ):
+                return "base"
+            return env_dir
+
+        return env_dir

@@ -16,6 +16,31 @@ from .registry import (
 )
 
 
+class Colors:
+    """ANSI color codes for terminal output."""
+    GREEN = "\033[32m"
+    BLUE = "\033[94m"
+    ORANGE = "\033[38;5;208m"
+    RESET = "\033[0m"
+
+    @classmethod
+    def enabled(cls) -> bool:
+        """Check if colors should be used."""
+        return sys.stdout.isatty()
+
+    @classmethod
+    def green(cls, text: str) -> str:
+        return f"{cls.GREEN}{text}{cls.RESET}" if cls.enabled() else text
+
+    @classmethod
+    def blue(cls, text: str) -> str:
+        return f"{cls.BLUE}{text}{cls.RESET}" if cls.enabled() else text
+
+    @classmethod
+    def orange(cls, text: str) -> str:
+        return f"{cls.ORANGE}{text}{cls.RESET}" if cls.enabled() else text
+
+
 class Spinner:
     """Animated spinner for long-running operations."""
 
@@ -90,7 +115,7 @@ def _get_env_type_display(env_path: str, env_type: str) -> str:
     """Get display type for an environment."""
     if env_type == "conda":
         if _is_conda_global(env_path):
-            return "conda (global)"
+            return "conda"
         return "conda (local)"
     return env_type
 
@@ -103,6 +128,24 @@ def _get_configured_scan_depth() -> int:
         return manager.scan_depth
     except Exception:
         return 7
+
+
+def _relative_path(path: str, base: str = None) -> str:
+    """Convert absolute path to relative path for display."""
+    from pathlib import Path
+    if base is None:
+        base = Path.cwd()
+    else:
+        base = Path(base)
+    try:
+        return str(Path(path).relative_to(base.resolve()))
+    except ValueError:
+        # Path is not relative to base, use os.path.relpath as fallback
+        try:
+            return os.path.relpath(path, str(base))
+        except ValueError:
+            # On Windows, relpath fails for paths on different drives
+            return path
 
 
 def find_jupyter_config_dir():
@@ -288,7 +331,8 @@ Commands:
   config show         Show current config location and status
 
 Options:
-  scan --depth N      Maximum directory depth to scan (default: 5)
+  scan --depth N      Maximum directory depth to scan (default: 7)
+  scan --no-update    Dry run: scan and report without changes
 
 Notes:
   - scan and register also cleanup non-existent environments from registries
@@ -299,6 +343,7 @@ Examples:
   nb_venv_kernels scan                    # Scan current directory
   nb_venv_kernels scan /path/to/projects  # Scan specific directory
   nb_venv_kernels scan --depth 3          # Limit scan depth
+  nb_venv_kernels scan --no-update        # Dry run mode
   nb_venv_kernels register /path/to/.venv
   nb_venv_kernels list
 """)
@@ -328,6 +373,11 @@ def main():
         "path",
         help="Path to the environment directory (e.g., .venv or /path/to/.venv)",
     )
+    register_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output in JSON format",
+    )
 
     # unregister command
     unregister_parser = subparsers.add_parser(
@@ -340,9 +390,14 @@ def main():
     )
 
     # list command
-    subparsers.add_parser(
+    list_parser = subparsers.add_parser(
         "list",
         help="List all registered environments",
+    )
+    list_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output in JSON format",
     )
 
     # scan command
@@ -360,7 +415,17 @@ def main():
         "--depth",
         type=int,
         default=None,
-        help="Maximum directory depth to scan (default: from config, usually 5)",
+        help="Maximum directory depth to scan (default: from config, usually 7)",
+    )
+    scan_parser.add_argument(
+        "--no-update",
+        action="store_true",
+        help="Dry run: scan and report without registering or removing",
+    )
+    scan_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output in JSON format",
     )
 
     # config command
@@ -388,21 +453,35 @@ def main():
     if args.command == "register":
         # Cleanup non-existent environments first
         cleanup_result = cleanup_registries()
-        if cleanup_result["removed"]:
-            print("Cleaned up non-existent environments:")
-            for path in cleanup_result["removed"]:
-                print(f"  - {path}")
-            print()
 
         try:
-            if register_environment(args.path):
+            newly_registered = register_environment(args.path)
+        except ValueError as e:
+            if getattr(args, 'json', False):
+                print(json.dumps({"error": str(e)}))
+            else:
+                print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        if getattr(args, 'json', False):
+            output = {
+                "path": os.path.abspath(args.path),
+                "registered": newly_registered,
+                "cleaned_up": [item for item in cleanup_result["removed"]],
+            }
+            print(json.dumps(output, indent=2))
+        else:
+            if cleanup_result["removed"]:
+                print("Cleaned up non-existent environments:")
+                for item in cleanup_result["removed"]:
+                    print(f"  - {item['path']} ({item['type']})")
+                print()
+
+            if newly_registered:
                 print(f"Registered: {args.path}")
             else:
                 print(f"Already registered: {args.path}")
-        except ValueError as e:
-            print(f"Error: {e}", file=sys.stderr)
-            sys.exit(1)
-        print()
+            print()
 
     elif args.command == "unregister":
         if unregister_environment(args.path):
@@ -413,92 +492,196 @@ def main():
 
     elif args.command == "list":
         envs = list_environments()
-        if not envs:
+
+        # Sort: conda global first, then conda local, uv, venv; by name within each
+        def sort_key(e):
+            env_type = e.get("type", "venv")
+            name = _get_env_display_name(e["path"], env_type).lower()
+            if env_type == "conda":
+                if _is_conda_global(e["path"]):
+                    return (0, name)  # conda global first
+                return (1, name)  # conda local
+            elif env_type == "uv":
+                return (2, name)
+            else:
+                return (3, name)  # venv
+
+        envs.sort(key=sort_key)
+
+        if getattr(args, 'json', False):
+            # JSON output
+            output = []
+            for env in envs:
+                output.append({
+                    "name": _get_env_display_name(env['path'], env.get("type", "venv")),
+                    "type": _get_env_type_display(env['path'], env.get("type", "venv")),
+                    "exists": env["exists"],
+                    "has_kernel": env["has_kernel"],
+                    "path": env["path"],
+                })
+            print(json.dumps(output, indent=2))
+        elif not envs:
             print("No environments found.")
             print("Use 'nb_venv_kernels register <path>' or 'nb_venv_kernels scan' to add environments.")
         else:
-            # Sort: conda global first, then conda local, uv, venv; by name within each
-            def sort_key(e):
-                env_type = e.get("type", "venv")
-                name = _get_env_display_name(e["path"], env_type).lower()
-                if env_type == "conda":
-                    if _is_conda_global(e["path"]):
-                        return (0, name)  # conda global first
-                    return (1, name)  # conda local
-                elif env_type == "uv":
-                    return (2, name)
-                else:
-                    return (3, name)  # venv
-
-            envs.sort(key=sort_key)
-
-            print(f"{'NAME':<25} {'TYPE':<16} {'EXISTS':<8} {'KERNEL':<8} {'PATH'}")
+            print()
+            print(f"{'name':<25} {'type':<16} {'exists':<8} {'kernel':<8} {'path'}")
             print("-" * 110)
             for env in envs:
                 name = _get_env_display_name(env['path'], env.get("type", "venv"))
                 env_type = _get_env_type_display(env['path'], env.get("type", "venv"))
                 exists = "yes" if env["exists"] else "NO"
                 kernel = "yes" if env["has_kernel"] else "no"
-                print(f"{name:<25} {env_type:<16} {exists:<8} {kernel:<8} {env['path']}")
+                # Use relative path except for conda global
+                if env.get("type") == "conda" and _is_conda_global(env['path']):
+                    display_path = env['path']
+                else:
+                    display_path = _relative_path(env['path'])
+                print(f"{name:<25} {env_type:<16} {exists:<8} {kernel:<8} {display_path}")
         print()
 
     elif args.command == "scan":
         scan_path = os.path.abspath(args.path)
         # Use configured depth if not specified via CLI
         depth = args.depth if args.depth is not None else _get_configured_scan_depth()
-        spinner = Spinner(f"Scanning {scan_path}")
+        dry_run = getattr(args, 'no_update', False)
+        json_output = getattr(args, 'json', False)
+
+        # No spinner for JSON output (machine-to-machine)
+        spinner = None if json_output else Spinner(f"Scanning {scan_path}")
 
         try:
-            spinner.start()
-            result = scan_directory(scan_path, max_depth=depth)
-            spinner.stop()
+            if spinner:
+                spinner.start()
+            result = scan_directory(scan_path, max_depth=depth, dry_run=dry_run)
+            if spinner:
+                spinner.stop()
         except ValueError as e:
-            spinner.stop()
-            print(f"Error: {e}", file=sys.stderr)
+            if spinner:
+                spinner.stop()
+            if json_output:
+                print(json.dumps({"error": str(e)}))
+            else:
+                print(f"Error: {e}", file=sys.stderr)
             sys.exit(1)
 
-        # Report removed (non-existent) environments
-        if result["removed"]:
-            print("Removed non-existent environments:")
-            for path in result["removed"]:
-                print(f"  - {path}")
-            print()
+        from .registry import is_uv_environment, _check_has_kernel
 
-        # Report newly registered environments in a table
-        if result["registered"]:
-            print(f"{'REGISTERED':<60} {'TYPE':<8}")
-            print("-" * 68)
-            for path in result["registered"]:
-                # Detect type
-                from .registry import is_uv_environment
-                env_type = "uv" if is_uv_environment(path) else "venv"
-                print(f"{path:<60} {env_type:<8}")
-            print()
+        def get_env_type(path):
+            if path in result.get("conda_found", []):
+                return "conda"
+            elif is_uv_environment(path):
+                return "uv"
+            return "venv"
 
-        # Report conda environments found (not registered)
-        if result["conda_found"]:
-            print("Conda environments found (discovered automatically via conda):")
-            for path in result["conda_found"]:
-                print(f"  - {path}")
-            print()
+        def get_env_status(path):
+            """Check if environment exists and has kernel."""
+            exists = os.path.isdir(path)
+            kernel_path = os.path.join(path, "share", "jupyter", "kernels")
+            has_kernel = _check_has_kernel(kernel_path) if exists else False
+            return exists, has_kernel
 
-        # Summary
-        total = len(result["registered"])
-        removed = len(result["removed"])
-        conda = len(result["conda_found"])
+        # Build unified list with action column
+        # Row format: (name, env_type, action, exists, has_kernel, path, action_order)
+        rows = []
 
-        if total == 0 and removed == 0 and conda == 0:
-            print("No new environments found.")
+        # Add (newly discovered)
+        for path in result["registered"]:
+            env_type = get_env_type(path)
+            name = _get_env_display_name(path, env_type)
+            exists, has_kernel = get_env_status(path)
+            rows.append((name, env_type, "add", exists, has_kernel, path, 0))
+
+        # Keep (already registered)
+        for path in result["skipped"] + result["conda_found"]:
+            env_type = get_env_type(path)
+            name = _get_env_display_name(path, env_type)
+            exists, has_kernel = get_env_status(path)
+            rows.append((name, env_type, "keep", exists, has_kernel, path, 1))
+
+        # Remove (not available)
+        for item in result["not_available"]:
+            path = item["path"]
+            env_type = item["type"]
+            name = _get_env_display_name(path, env_type)
+            rows.append((name, env_type, "remove", False, False, path, 2))
+
+        # Sort by action order, then by type order, then by name
+        def sort_key(row):
+            name, env_type, action, exists, has_kernel, path, action_order = row
+            type_order = {"conda": 0, "uv": 1, "venv": 2}.get(env_type, 3)
+            return (action_order, type_order, name.lower())
+
+        rows.sort(key=sort_key)
+
+        def colorize_action(action):
+            if action == "add":
+                return Colors.green(action)
+            elif action == "keep":
+                return Colors.blue(action)
+            elif action == "remove":
+                return Colors.orange(action)
+            return action
+
+        # Summary counts
+        total_add = len(result["registered"])
+        total_keep = len(result["skipped"]) + len(result["conda_found"])
+        total_remove = len(result["not_available"])
+
+        if json_output:
+            output = {
+                "environments": [
+                    {
+                        "action": action,
+                        "name": name,
+                        "type": env_type,
+                        "exists": exists,
+                        "has_kernel": has_kernel,
+                        "path": path,
+                    }
+                    for name, env_type, action, exists, has_kernel, path, _ in rows
+                ],
+                "summary": {
+                    "add": total_add,
+                    "keep": total_keep,
+                    "remove": total_remove,
+                },
+                "dry_run": dry_run,
+            }
+            print(json.dumps(output, indent=2))
         else:
-            parts = []
-            if total > 0:
-                parts.append(f"{total} registered")
-            if removed > 0:
-                parts.append(f"{removed} removed")
-            if conda > 0:
-                parts.append(f"{conda} conda found")
-            print(f"Summary: {', '.join(parts)}")
-        print()
+            if rows:
+                print()
+                print(f"{'action':<10} {'name':<25} {'type':<16} {'exists':<8} {'kernel':<8} {'path'}")
+                print("-" * 130)
+                for name, env_type, action, exists, has_kernel, path, _ in rows:
+                    # Pad action before colorizing to maintain alignment
+                    action_colored = colorize_action(action) + " " * (10 - len(action))
+                    exists_str = "yes" if exists else "NO"
+                    kernel_str = "yes" if has_kernel else "no"
+                    # Use relative path except for conda global
+                    if env_type == "conda" and _is_conda_global(path):
+                        display_path = path
+                    else:
+                        display_path = _relative_path(path)
+                    print(f"{action_colored} {name:<25} {env_type:<16} {exists_str:<8} {kernel_str:<8} {display_path}")
+                print()
+
+            if total_add == 0 and total_keep == 0 and total_remove == 0:
+                print("No environments found.")
+            else:
+                parts = []
+                if total_add > 0:
+                    parts.append(f"{total_add} add")
+                if total_keep > 0:
+                    parts.append(f"{total_keep} keep")
+                if total_remove > 0:
+                    parts.append(f"{total_remove} remove")
+                summary = f"Summary: {', '.join(parts)}"
+                if dry_run:
+                    summary += " (no changes made)"
+                print(summary)
+            print()
 
     elif args.command == "config":
         if args.action == "enable":

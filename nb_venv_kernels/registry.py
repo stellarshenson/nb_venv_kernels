@@ -283,11 +283,11 @@ def _check_has_kernel(kernel_path: str) -> bool:
         return False
 
 
-def cleanup_registries() -> Dict[str, List[str]]:
+def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
     """Remove non-existent environments from both registries.
 
     Returns:
-        Dict with 'removed' list of paths that were removed.
+        Dict with 'removed' list of dicts containing 'path' and 'type'.
     """
     removed = []
 
@@ -310,7 +310,7 @@ def cleanup_registries() -> Dict[str, List[str]]:
             if os.path.isdir(env_path):
                 new_lines.append(line)
             else:
-                removed.append(env_path)
+                removed.append({"path": env_path, "type": source})
 
         # Write back if changed
         if len(new_lines) < len(lines):
@@ -340,7 +340,8 @@ def is_conda_environment(path: str) -> bool:
     return os.path.isdir(os.path.join(path, "conda-meta"))
 
 
-def scan_directory(root_path: str, max_depth: int = 7) -> Dict[str, List[str]]:
+def scan_directory(root_path: str, max_depth: int = 7,
+                   dry_run: bool = False) -> Dict[str, List]:
     """Scan directory tree for virtual environments.
 
     Searches for venv, uv, and conda environments. Registers found
@@ -349,18 +350,34 @@ def scan_directory(root_path: str, max_depth: int = 7) -> Dict[str, List[str]]:
     Args:
         root_path: Directory to start scanning from
         max_depth: Maximum depth to recurse (default: 7, None = unlimited)
+        dry_run: If True, only report without making changes
 
     Returns:
-        Dict with 'registered', 'skipped', 'removed', 'conda_found' lists.
+        Dict with 'registered', 'skipped', 'removed', 'conda_found', 'not_available' lists.
     """
     root_path = os.path.abspath(os.path.expanduser(root_path))
 
     if not os.path.isdir(root_path):
         raise ValueError(f"Directory does not exist: {root_path}")
 
-    # First cleanup registries
-    cleanup_result = cleanup_registries()
-    removed = cleanup_result["removed"]
+    # Cleanup registries (or just check for not available in dry run)
+    not_available = []
+    if dry_run:
+        # Check what would be removed without actually removing
+        for source, registry_path in [("venv", get_venv_registry_path()),
+                                       ("uv", get_uv_registry_path())]:
+            if not registry_path.exists():
+                continue
+            with open(registry_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith("#"):
+                        env_path = os.path.abspath(os.path.expanduser(stripped))
+                        if not os.path.isdir(env_path):
+                            not_available.append({"path": env_path, "type": source})
+    else:
+        cleanup_result = cleanup_registries()
+        not_available = cleanup_result["removed"]
 
     registered = []
     skipped = []
@@ -415,14 +432,22 @@ def scan_directory(root_path: str, max_depth: int = 7) -> Dict[str, List[str]]:
                 if is_conda_environment(full_path):
                     conda_found.append(full_path)
                 else:
-                    # Try to register
-                    try:
-                        if register_environment(full_path):
-                            registered.append(full_path)
-                        else:
+                    if dry_run:
+                        # In dry run, check if already registered
+                        existing = read_environments()
+                        if full_path in existing:
                             skipped.append(full_path)
-                    except ValueError:
-                        pass  # Not a valid environment
+                        else:
+                            registered.append(full_path)
+                    else:
+                        # Try to register
+                        try:
+                            if register_environment(full_path):
+                                registered.append(full_path)
+                            else:
+                                skipped.append(full_path)
+                        except ValueError:
+                            pass  # Not a valid environment
                 # Don't recurse into environments
                 continue
 
@@ -434,6 +459,6 @@ def scan_directory(root_path: str, max_depth: int = 7) -> Dict[str, List[str]]:
     return {
         "registered": registered,
         "skipped": skipped,
-        "removed": removed,
+        "not_available": not_available,
         "conda_found": conda_found,
     }

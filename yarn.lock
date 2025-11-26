@@ -2154,7 +2154,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@jupyterlab/apputils@npm:^4.6.0":
+"@jupyterlab/apputils@npm:^4.0.0, @jupyterlab/apputils@npm:^4.6.0":
   version: 4.6.0
   resolution: "@jupyterlab/apputils@npm:4.6.0"
   dependencies:
@@ -2474,6 +2474,21 @@ __metadata:
     vscode-languageserver-protocol: ^3.17.0
     vscode-ws-jsonrpc: ~1.0.2
   checksum: 6d6d94259bbd0de7a1a1048ae1b9ebcb1d1d5fa51a96ba35cb6c43b106b25ca669a61247783c5911ef8e155aa70a4b50dc3ebaff4b565a01516d0a9fc633094b
+  languageName: node
+  linkType: hard
+
+"@jupyterlab/mainmenu@npm:^4.0.0":
+  version: 4.5.0
+  resolution: "@jupyterlab/mainmenu@npm:4.5.0"
+  dependencies:
+    "@jupyterlab/apputils": ^4.6.0
+    "@jupyterlab/translation": ^4.5.0
+    "@jupyterlab/ui-components": ^4.5.0
+    "@lumino/algorithm": ^2.0.4
+    "@lumino/commands": ^2.3.3
+    "@lumino/coreutils": ^2.2.2
+    "@lumino/widgets": ^2.7.2
+  checksum: eb2c0db19a2463b6e0f4767e1f459d8efa81310fcd9155d8cfcb0982ff3a9c832947a6ed377ec8f0e9f7ec9e0584943fdfced4c8ff2fb57925aa831b49e75d2a
   languageName: node
   linkType: hard
 
@@ -3080,7 +3095,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@lumino/widgets@npm:^1.37.2 || ^2.7.2, @lumino/widgets@npm:^2.7.2":
+"@lumino/widgets@npm:^1.37.2 || ^2.7.2, @lumino/widgets@npm:^2.0.0, @lumino/widgets@npm:^2.7.2":
   version: 2.7.2
   resolution: "@lumino/widgets@npm:2.7.2"
   dependencies:
@@ -8464,10 +8479,13 @@ __metadata:
   resolution: "nb_venv_kernels@workspace:."
   dependencies:
     "@jupyterlab/application": ^4.0.0
+    "@jupyterlab/apputils": ^4.0.0
     "@jupyterlab/builder": ^4.0.0
     "@jupyterlab/coreutils": ^6.0.0
+    "@jupyterlab/mainmenu": ^4.0.0
     "@jupyterlab/services": ^7.0.0
     "@jupyterlab/testutils": ^4.0.0
+    "@lumino/widgets": ^2.0.0
     "@types/jest": ^29.2.0
     "@types/json-schema": ^7.0.11
     "@types/react": ^18.0.26
