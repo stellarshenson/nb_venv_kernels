@@ -10,7 +10,10 @@ async def test_list_environments(jp_fetch):
 
     assert response.code == 200
     payload = json.loads(response.body)
-    assert isinstance(payload, list)
+    assert isinstance(payload, dict)
+    assert "environments" in payload
+    assert "workspace_root" in payload
+    assert isinstance(payload["environments"], list)
 
 
 async def test_scan_environments(jp_fetch):

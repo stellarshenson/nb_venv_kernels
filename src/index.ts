@@ -104,25 +104,17 @@ function buildResultsContent(result: IScanResult): string {
 
   const rows = sortedEnvs
     .map(env => {
-      let actionStyle = '';
-      if (env.action === 'add') {
-        actionStyle = 'color: #22c55e; font-weight: 500;';
-      } else if (env.action === 'keep') {
-        actionStyle = 'color: #3b82f6;';
-      } else if (env.action === 'remove') {
-        actionStyle = 'color: #f97316;';
-      }
-
-      const existsText = env.exists ? 'yes' : '<span style="color: #ef4444;">no</span>';
-      const kernelText = env.has_kernel ? 'yes' : '<span style="color: #ef4444;">no</span>';
+      const existsText = env.exists ? 'yes' : '<span class="nb-venv-no">no</span>';
+      const kernelText = env.has_kernel ? 'yes' : '<span class="nb-venv-no">no</span>';
+      const actionClass = `nb-venv-action-${env.action}`;
 
       return `<tr>
-      <td style="${actionStyle} padding: 4px 8px;">${env.action}</td>
-      <td style="padding: 4px 8px;">${env.name}</td>
-      <td style="padding: 4px 8px;">${env.type}</td>
-      <td style="padding: 4px 8px;">${existsText}</td>
-      <td style="padding: 4px 8px;">${kernelText}</td>
-      <td style="padding: 4px 8px; font-family: var(--jp-code-font-family); font-size: 0.9em;">${env.path}</td>
+      <td class="${actionClass}">${env.action}</td>
+      <td>${env.name}</td>
+      <td>${env.type}</td>
+      <td>${existsText}</td>
+      <td>${kernelText}</td>
+      <td class="path-col">${env.path}</td>
     </tr>`;
     })
     .join('');
@@ -146,23 +138,34 @@ function buildResultsContent(result: IScanResult): string {
     : '';
 
   return `
+    <style>
+      .nb-venv-table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: var(--jp-ui-font-size1); }
+      .nb-venv-table th, .nb-venv-table td { text-align: left; padding: 1px 6px; white-space: nowrap; vertical-align: baseline; }
+      .nb-venv-table thead tr { border-bottom: 1px solid var(--jp-border-color1); }
+      .nb-venv-table tbody tr { line-height: 1.2; }
+      .nb-venv-table .path-col { font-family: var(--jp-code-font-family); font-size: var(--jp-code-font-size); white-space: normal; }
+      .nb-venv-action-add { color: #22c55e; font-weight: 500; }
+      .nb-venv-action-keep { color: #3b82f6; }
+      .nb-venv-action-remove { color: #f97316; }
+      .nb-venv-no { color: #ef4444; }
+    </style>
     ${intro}
-    <table style="border-collapse: collapse; width: 100%; margin-top: 8px;">
+    <table class="nb-venv-table">
       <thead>
-        <tr style="border-bottom: 1px solid var(--jp-border-color1);">
-          <th style="text-align: left; padding: 4px 8px;">action</th>
-          <th style="text-align: left; padding: 4px 8px;">name</th>
-          <th style="text-align: left; padding: 4px 8px;">type</th>
-          <th style="text-align: left; padding: 4px 8px;">exists</th>
-          <th style="text-align: left; padding: 4px 8px;">kernel</th>
-          <th style="text-align: left; padding: 4px 8px;">path (relative to workspace)</th>
+        <tr>
+          <th>action</th>
+          <th>name</th>
+          <th>type</th>
+          <th>exists</th>
+          <th>kernel</th>
+          <th>path (relative to workspace)</th>
         </tr>
       </thead>
       <tbody>
         ${rows}
       </tbody>
     </table>
-    <p style="margin-top: 12px; color: var(--jp-ui-font-color2);"><strong>Summary:</strong> ${summaryParts.join(', ')}</p>
+    <p style="margin-top: 8px; color: var(--jp-ui-font-color2);"><strong>Summary:</strong> ${summaryParts.join(', ')}</p>
     ${kernelNote}
   `;
 }

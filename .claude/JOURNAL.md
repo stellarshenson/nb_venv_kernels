@@ -117,3 +117,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 38. **Task - Workspace-relative paths**: Updated path display in CLI and frontend to show paths relative to server workspace. Added workspace boundary validation to prevent scans outside workspace. Added helper functions get_workspace_root(), path_relative_to_workspace(), is_path_within_workspace() in manager.py. Routes use server's root_dir setting. Column headers now show "path (relative to workspace)". Fixed tilde expansion bug in routes.py (server_root_dir returns ~/workspace which needs os.path.expanduser)<br>
     **Result**: All paths displayed relative to workspace root. Scans outside workspace blocked. Web API working after tilde expansion fix
+
+39. **Task - Compact modal table rows**: Reduced spacing between rows in scan results modal table<br>
+    **Result**: Changed line-height from 1.4 to 1.2, padding from 2px 8px to 1px 6px, added vertical-align: baseline
