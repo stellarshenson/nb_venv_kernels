@@ -7,9 +7,18 @@
 [![JupyterLab 4](https://img.shields.io/badge/JupyterLab-4-orange.svg)](https://jupyterlab.readthedocs.io/en/stable/)
 [![Brought To You By KOLOMOLO](https://img.shields.io/badge/Brought%20To%20You%20By-KOLOMOLO-00ffff?style=flat)](https://kolomolo.com)
 
-Composite Jupyter kernel spec manager that discovers kernels from conda, venv and uv Python environments. Combines functionality of nb_conda_kernels with venv/uv environment discovery.
+Use Python virtual environments as Jupyter kernels. Discovers and registers kernels from venv, uv, and conda environments in JupyterLab's kernel selector.
 
 ![UV and Conda virtual environments co-exist and are properly discovered](.resources/screenshot.png)
+
+## Features
+
+- **Unified kernel discovery** - conda, venv, and uv environments in one kernel selector
+- **Auto-detection** - distinguishes uv from venv via `pyvenv.cfg`
+- **Smart ordering** - current environment first, then conda, uv, venv, system
+- **Drop-in replacement** - replaces nb_conda_kernels while preserving all conda functionality
+- **CLI management** - register, unregister, and list environments
+- **Zero config** - auto-enables on install, works immediately
 
 ## Install
 
