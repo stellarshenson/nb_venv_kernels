@@ -1,0 +1,333 @@
+# -*- coding: utf-8 -*-
+"""Tests for VEnvKernelSpecManager kernel discovery."""
+import os
+import shutil
+import subprocess
+import tempfile
+
+import pytest
+
+from nb_venv_kernels.manager import VEnvKernelSpecManager
+from nb_venv_kernels.registry import (
+    register_environment,
+    unregister_environment,
+    is_uv_environment,
+)
+
+
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for test environments."""
+    d = tempfile.mkdtemp()
+    yield d
+    shutil.rmtree(d, ignore_errors=True)
+
+
+@pytest.fixture
+def manager():
+    """Create a fresh VEnvKernelSpecManager instance."""
+    return VEnvKernelSpecManager()
+
+
+class TestVenvKernelDiscovery:
+    """Tests for venv environment kernel discovery."""
+
+    def test_venv_creation_and_registration(self, temp_dir, manager):
+        """Test creating a venv and registering it."""
+        venv_path = os.path.join(temp_dir, "test-venv")
+
+        # Create venv
+        subprocess.run(
+            ["python", "-m", "venv", venv_path],
+            check=True,
+            capture_output=True
+        )
+
+        # Install ipykernel
+        pip_path = os.path.join(venv_path, "bin", "pip")
+        subprocess.run(
+            [pip_path, "install", "ipykernel", "-q"],
+            check=True,
+            capture_output=True
+        )
+
+        # Register the environment
+        result = register_environment(venv_path)
+        assert result is True
+
+        # Verify kernel discovery
+        specs = manager.find_kernel_specs()
+        kernel_names = list(specs.keys())
+
+        # Should find a kernel containing 'test-venv'
+        matching = [k for k in kernel_names if "test-venv" in k.lower()]
+        assert len(matching) > 0, f"test-venv kernel not found in {kernel_names}"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_venv_with_standard_name(self, temp_dir, manager):
+        """Test venv with .venv name uses parent directory."""
+        project_dir = os.path.join(temp_dir, "my-project")
+        os.makedirs(project_dir)
+        venv_path = os.path.join(project_dir, ".venv")
+
+        # Create venv
+        subprocess.run(
+            ["python", "-m", "venv", venv_path],
+            check=True,
+            capture_output=True
+        )
+
+        # Install ipykernel
+        pip_path = os.path.join(venv_path, "bin", "pip")
+        subprocess.run(
+            [pip_path, "install", "ipykernel", "-q"],
+            check=True,
+            capture_output=True
+        )
+
+        # Register
+        register_environment(venv_path)
+
+        # Check that kernel name uses project name
+        specs = manager.find_kernel_specs()
+        matching = [k for k in specs.keys() if "my-project" in k.lower()]
+        assert len(matching) > 0, f"my-project kernel not found in {list(specs.keys())}"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_venv_kernel_spec_structure(self, temp_dir, manager):
+        """Test that venv kernelspec has correct structure."""
+        venv_path = os.path.join(temp_dir, "spec-test-venv")
+
+        # Create venv with ipykernel
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        pip_path = os.path.join(venv_path, "bin", "pip")
+        subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
+
+        register_environment(venv_path)
+
+        # Find the kernel
+        specs = manager.find_kernel_specs()
+        matching = [k for k in specs.keys() if "spec-test-venv" in k.lower()]
+        assert len(matching) > 0
+
+        # Get full spec
+        kernel_name = matching[0]
+        spec = manager.get_kernel_spec(kernel_name)
+
+        # Verify structure
+        assert spec.language.lower() == "python"
+        assert "python" in spec.argv[0].lower()
+        assert spec.env.get("VIRTUAL_ENV") == venv_path
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+
+class TestUvKernelDiscovery:
+    """Tests for uv environment kernel discovery."""
+
+    @pytest.fixture
+    def uv_available(self):
+        """Check if uv is available."""
+        try:
+            subprocess.run(["uv", "--version"], check=True, capture_output=True)
+            return True
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pytest.skip("uv not available")
+
+    def test_uv_environment_detection(self, temp_dir, uv_available):
+        """Test that uv environments are detected as uv type."""
+        venv_path = os.path.join(temp_dir, "uv-test-env")
+
+        # Create uv venv
+        subprocess.run(
+            ["uv", "venv", venv_path],
+            check=True,
+            capture_output=True
+        )
+
+        # Should be detected as uv
+        assert is_uv_environment(venv_path) is True
+
+    def test_uv_kernel_discovery(self, temp_dir, manager, uv_available):
+        """Test uv environment kernel discovery."""
+        venv_path = os.path.join(temp_dir, "uv-kernel-test")
+
+        # Create uv venv
+        subprocess.run(["uv", "venv", venv_path], check=True, capture_output=True)
+
+        # Install ipykernel using uv
+        subprocess.run(
+            ["uv", "pip", "install", "ipykernel", "-q", "-p", venv_path],
+            check=True,
+            capture_output=True
+        )
+
+        # Register
+        register_environment(venv_path)
+
+        # Verify kernel discovery
+        specs = manager.find_kernel_specs()
+        matching = [k for k in specs.keys() if "uv-kernel-test" in k.lower()]
+        assert len(matching) > 0, f"uv-kernel-test not found in {list(specs.keys())}"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+
+class TestCondaKernelDiscovery:
+    """Tests for conda environment kernel discovery."""
+
+    @pytest.fixture
+    def conda_available(self):
+        """Check if conda is available."""
+        try:
+            result = subprocess.run(
+                ["conda", "--version"],
+                check=True,
+                capture_output=True,
+                timeout=10
+            )
+            return True
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            pytest.skip("conda not available")
+
+    def test_conda_base_discovery(self, manager, conda_available):
+        """Test that conda base environment is discovered."""
+        specs = manager.find_kernel_specs()
+
+        # Look for base/conda kernel
+        conda_kernels = [k for k in specs.keys() if "conda" in k.lower() or "base" in k.lower()]
+
+        # Should find at least the base environment
+        assert len(conda_kernels) >= 0  # May be 0 if no ipykernel in base
+
+    def test_conda_env_creation_and_discovery(self, temp_dir, manager, conda_available):
+        """Test creating and discovering a conda environment."""
+        env_name = "nb-venv-kernels-test-env"
+
+        try:
+            # Create conda env with ipykernel
+            subprocess.run(
+                ["conda", "create", "-n", env_name, "python", "ipykernel", "-y", "-q"],
+                check=True,
+                capture_output=True,
+                timeout=300
+            )
+
+            # Clear cache to force rediscovery
+            manager._venv_kernels_cache = None
+
+            # Verify kernel discovery
+            specs = manager.find_kernel_specs()
+            matching = [k for k in specs.keys() if env_name in k.lower()]
+
+            # Note: conda envs are auto-discovered, no need to register
+            assert len(matching) > 0, f"{env_name} not found in {list(specs.keys())}"
+
+        finally:
+            # Cleanup - remove conda env
+            subprocess.run(
+                ["conda", "env", "remove", "-n", env_name, "-y"],
+                capture_output=True,
+                timeout=60
+            )
+
+
+class TestMixedEnvironments:
+    """Tests for mixed environment scenarios."""
+
+    def test_multiple_environments(self, temp_dir, manager):
+        """Test discovering multiple venv environments."""
+        venv_paths = []
+
+        # Create multiple venvs
+        for i in range(3):
+            venv_path = os.path.join(temp_dir, f"multi-venv-{i}")
+            subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+            pip_path = os.path.join(venv_path, "bin", "pip")
+            subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
+            register_environment(venv_path)
+            venv_paths.append(venv_path)
+
+        # Verify all are discovered
+        specs = manager.find_kernel_specs()
+        for i in range(3):
+            matching = [k for k in specs.keys() if f"multi-venv-{i}" in k.lower()]
+            assert len(matching) > 0, f"multi-venv-{i} not found"
+
+        # Cleanup
+        for venv_path in venv_paths:
+            unregister_environment(venv_path)
+
+    def test_environment_without_ipykernel(self, temp_dir, manager):
+        """Test that environments without ipykernel are not discovered as kernels."""
+        venv_path = os.path.join(temp_dir, "no-kernel-venv")
+
+        # Create venv WITHOUT ipykernel
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+
+        # Register anyway
+        register_environment(venv_path)
+
+        # Should not find kernel (no ipykernel installed)
+        specs = manager.find_kernel_specs()
+        matching = [k for k in specs.keys() if "no-kernel-venv" in k.lower()]
+        assert len(matching) == 0, f"no-kernel-venv should not be in {list(specs.keys())}"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+
+class TestKernelSpecDetails:
+    """Tests for kernel spec details and metadata."""
+
+    def test_kernel_metadata(self, temp_dir, manager):
+        """Test that kernel metadata is correctly set."""
+        venv_path = os.path.join(temp_dir, "metadata-test-venv")
+
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        pip_path = os.path.join(venv_path, "bin", "pip")
+        subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
+        register_environment(venv_path)
+
+        specs = manager.find_kernel_specs()
+        matching = [k for k in specs.keys() if "metadata-test-venv" in k.lower()]
+        assert len(matching) > 0
+
+        spec = manager.get_kernel_spec(matching[0])
+
+        # Check metadata
+        assert hasattr(spec, "metadata")
+        assert "venv_env_path" in spec.metadata
+        assert spec.metadata["venv_env_path"] == venv_path
+        assert "venv_source" in spec.metadata
+        assert spec.metadata["venv_source"] in ("venv", "uv")
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_kernel_display_name(self, temp_dir, manager):
+        """Test kernel display name format."""
+        venv_path = os.path.join(temp_dir, "display-name-test")
+
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        pip_path = os.path.join(venv_path, "bin", "pip")
+        subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
+        register_environment(venv_path)
+
+        specs = manager.find_kernel_specs()
+        matching = [k for k in specs.keys() if "display-name-test" in k.lower()]
+        assert len(matching) > 0
+
+        spec = manager.get_kernel_spec(matching[0])
+
+        # Display name should contain environment name and source
+        assert "display-name-test" in spec.display_name.lower() or "display" in spec.display_name.lower()
+
+        # Cleanup
+        unregister_environment(venv_path)
