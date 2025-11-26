@@ -37,6 +37,8 @@ Results display in a modal with action indicators.
 - **Programmatic API** - REST endpoints and Python API for automation (`--json` flag)
 - **Zero config** - auto-enables on install, works immediately
 
+*Built because someone got tired of typing `python -m ipykernel install --user --name=...` for the 42nd time.*
+
 ## Install
 
 This package should be installed in the environment from which you run Jupyter Notebook or JupyterLab. This might be your base conda environment, but it need not be. For instance, if you have a dedicated `jupyter_env` environment:
