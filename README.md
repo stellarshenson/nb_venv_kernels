@@ -204,7 +204,7 @@ The extension provides REST and Python APIs for integration with tools and autom
 - **JSON output** - CLI commands support `--json` flag for machine-to-machine communication
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph Interfaces
         CLI[nb_venv_kernels CLI]
         MENU[JupyterLab Kernel Menu]
