@@ -51,3 +51,12 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 16. **Task - Separate registries for venv and uv**: Split environment registries by source type<br>
     **Result**: venv environments at `~/.venv/environments.txt`, uv environments at `~/.uv/environments.txt`, auto-detection via pyvenv.cfg on register, consolidated is_uv_environment in registry.py
+
+17. **Task - Implement kernel ordering**: Added kernel sort order in selector<br>
+    **Result**: Kernels ordered as: current environment first, then conda, uv, venv, system (alphabetical within groups). Added `_get_kernel_sort_key()` method in manager.py
+
+18. **Task - README badges and features**: Enhanced README with badges and documentation<br>
+    **Result**: Added GitHub Actions, npm, PyPI, downloads, JupyterLab 4 badges. Added Features section with drop-in replacement note. Documented environment registries locations explicitly
+
+19. **Task - Mermaid diagram and ipykernel**: Added discovery flow diagram and ipykernel requirement<br>
+    **Result**: Added mermaid flowchart showing registries, auto-discovery, and kernel spec managers. Documented ipykernel requirement for virtual environments to be discoverable
