@@ -11,7 +11,7 @@ import re
 import time
 from os.path import join, dirname, basename, abspath
 
-from traitlets import Bool, Unicode
+from traitlets import Bool, Unicode, Integer
 from jupyter_client.kernelspec import KernelSpecManager, KernelSpec, NoSuchKernel
 
 # Try to import CondaKernelSpecManager for combined functionality
@@ -55,6 +55,12 @@ class VEnvKernelSpecManager(KernelSpecManager):
         "{language} [{source} env:{environment}]",
         config=True,
         help="Display name format. Available: {language}, {environment}, {kernel}, {display_name}, {source}"
+    )
+
+    scan_depth = Integer(
+        7,
+        config=True,
+        help="Default directory depth for 'nb_venv_kernels scan' command."
     )
 
     def __init__(self, **kwargs):

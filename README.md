@@ -17,7 +17,8 @@ Use Python virtual environments as Jupyter kernels. Discovers and registers kern
 - **Auto-detection** - distinguishes uv from venv via `pyvenv.cfg`
 - **Smart ordering** - current environment first, then conda, uv, venv, system
 - **Drop-in replacement** - replaces [nb_conda_kernels](https://github.com/Anaconda-Platform/nb_conda_kernels) while preserving all conda functionality
-- **CLI management** - register, unregister, and list environments
+- **Directory scanning** - scan project directories to find and register environments
+- **CLI management** - register, unregister, scan, list (all env types), and configure
 - **Zero config** - auto-enables on install, works immediately
 
 ## Install
@@ -46,15 +47,49 @@ Virtual environments require `ipykernel` installed to be discoverable. The `ipyk
 pip install ipykernel
 ```
 
-Then register the environment:
+### Scanning for Environments
+
+Scan a directory tree to find and register all venv/uv environments:
+
+```bash
+nb_venv_kernels scan                      # Scan current directory
+nb_venv_kernels scan /path/to/projects    # Scan specific directory
+nb_venv_kernels scan --depth 3            # Limit recursion depth (default: 5)
+```
+
+The scan command automatically:
+- Finds venv and uv environments by detecting `bin/python`
+- Registers them in the appropriate registry (`~/.venv/` or `~/.uv/`)
+- Cleans up non-existent environments from registries
+- Reports conda environments found (they are discovered via `conda env list`)
+
+### Manual Registration
 
 ```bash
 nb_venv_kernels register /path/to/.venv
-nb_venv_kernels list
 nb_venv_kernels unregister /path/to/.venv
 ```
 
-Manage Jupyter configuration:
+### Listing Environments
+
+The `list` command shows all environments (conda, uv, venv) with their status:
+
+```bash
+nb_venv_kernels list
+```
+
+```
+NAME                      TYPE             EXISTS   KERNEL   PATH
+--------------------------------------------------------------------------------------------------------------
+base                      conda (global)   yes      yes      /opt/conda
+my-conda-env              conda (local)    yes      yes      /opt/conda/envs/my-conda-env
+my-project                uv               yes      yes      /home/user/my-project/.venv
+another-project           venv             yes      no       /home/user/another-project/venv
+```
+
+Environments are sorted by type (conda global, conda local, uv, venv) then by name. The KERNEL column indicates whether `ipykernel` is installed.
+
+### Jupyter Configuration
 
 ```bash
 nb_venv_kernels config enable     # Enable VEnvKernelSpecManager
@@ -78,6 +113,11 @@ The `register` command auto-detects uv environments via `pyvenv.cfg` and writes 
 
 ```mermaid
 flowchart LR
+    subgraph CLI
+        SCAN[nb_venv_kernels scan]
+        REG[nb_venv_kernels register]
+    end
+
     subgraph Registries
         VENV[~/.venv/environments.txt]
         UV[~/.uv/environments.txt]
@@ -94,14 +134,19 @@ flowchart LR
         CKSPM[CondaKernelSpecManager]
     end
 
+    SCAN -->|finds envs| VENV
+    SCAN -->|finds envs| UV
+    REG -->|registers| UV
+    PYVENV -.->|detects uv| UV
     VENV --> KSPM
     UV --> KSPM
-    PYVENV -.->|detects uv| UV
     CONDA_REG --> CKSPM
     CONDA_ENV --> CKSPM
     CKSPM --> KSPM
     KSPM --> JL[JupyterLab Kernel Selector]
 
+    style SCAN stroke:#10b981,stroke-width:2px
+    style REG stroke:#10b981,stroke-width:2px
     style VENV stroke:#10b981,stroke-width:2px
     style UV stroke:#a855f7,stroke-width:2px
     style CONDA_REG stroke:#f59e0b,stroke-width:2px
@@ -126,6 +171,7 @@ Optional settings in `jupyter_server_config.py`:
 c.VEnvKernelSpecManager.venv_only = True                      # Hide system/conda kernels
 c.VEnvKernelSpecManager.env_filter = r"\.tox|\.nox"           # Exclude by pattern
 c.VEnvKernelSpecManager.name_format = "{language} [{source} env:{environment}]"  # Default format
+c.VEnvKernelSpecManager.scan_depth = 7                        # Default depth for scan command
 ```
 
 **Display name variables**: `{language}`, `{environment}`, `{source}` (uv/venv), `{kernel}`, `{display_name}`

@@ -60,3 +60,12 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 19. **Task - Mermaid diagram and ipykernel**: Added discovery flow diagram and ipykernel requirement<br>
     **Result**: Added mermaid flowchart showing registries, auto-discovery, and kernel spec managers. Documented ipykernel requirement for virtual environments to be discoverable
+
+20. **Task - Scan command and cleanup**: Implemented v1.1.0 with scan and registry cleanup features<br>
+    **Result**: Added `scan` command to find venv/uv environments in directory trees with animated spinner, cleanup function removes non-existent environments from registries (called by both scan and register), comprehensive skip list for node_modules/caches/build dirs, updated README with scan documentation
+
+21. **Task - Enhanced list command**: List shows all environment types with improved formatting<br>
+    **Result**: Added NAME, TYPE, EXISTS, KERNEL, PATH columns. Shows conda (global/local), uv, venv types. Sorted by type then name. Names derived from project directories. Added get_conda_environments() to fetch from conda env list
+
+22. **Task - Configurable scan depth**: Added scan_depth as Jupyter server config option<br>
+    **Result**: Added `scan_depth` traitlet to VEnvKernelSpecManager (default: 7), CLI reads from config if --depth not specified, updated mermaid diagram to show CLI scan/register populating registries

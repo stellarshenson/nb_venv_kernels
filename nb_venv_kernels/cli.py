@@ -4,12 +4,105 @@ import argparse
 import json
 import os
 import sys
+import threading
+import time
 
 from .registry import (
     register_environment,
     unregister_environment,
     list_environments,
+    cleanup_registries,
+    scan_directory,
 )
+
+
+class Spinner:
+    """Animated spinner for long-running operations."""
+
+    def __init__(self, message: str = "Scanning"):
+        self.message = message
+        self.frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        self.running = False
+        self.thread = None
+
+    def _spin(self):
+        idx = 0
+        while self.running:
+            frame = self.frames[idx % len(self.frames)]
+            sys.stderr.write(f"\r{frame} {self.message}...")
+            sys.stderr.flush()
+            idx += 1
+            time.sleep(0.1)
+
+    def start(self):
+        # Only show spinner if stderr is a terminal
+        if not sys.stderr.isatty():
+            return
+        self.running = True
+        self.thread = threading.Thread(target=self._spin, daemon=True)
+        self.thread.start()
+
+    def stop(self, final_message: str = None):
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=0.5)
+        # Clear the spinner line completely
+        if sys.stderr.isatty():
+            sys.stderr.write("\r" + " " * 80 + "\r")
+            sys.stderr.flush()
+        if final_message:
+            print(final_message)
+
+
+def _is_conda_global(env_path: str) -> bool:
+    """Check if conda environment is global (base installation)."""
+    basename = os.path.basename(env_path).lower()
+    base_names = {"conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
+                  "miniforge", "miniforge3", "mambaforge", "mambaforge3"}
+    return basename in base_names
+
+
+def _get_env_display_name(env_path: str, env_type: str) -> str:
+    """Get display name for an environment.
+
+    For venv/uv: use parent directory name (project name)
+    For conda base: use 'base'
+    For conda envs: use the env directory name
+    """
+    basename = os.path.basename(env_path)
+
+    # For venv/uv, common venv folder names -> use parent (project) name
+    if env_type in ("venv", "uv"):
+        if basename in (".venv", "venv", ".env", "env", ".virtualenv", "virtualenv"):
+            return os.path.basename(os.path.dirname(env_path))
+        return basename
+
+    # For conda
+    if env_type == "conda":
+        if _is_conda_global(env_path):
+            return "base"
+        return basename
+
+    return basename
+
+
+def _get_env_type_display(env_path: str, env_type: str) -> str:
+    """Get display type for an environment."""
+    if env_type == "conda":
+        if _is_conda_global(env_path):
+            return "conda (global)"
+        return "conda (local)"
+    return env_type
+
+
+def _get_configured_scan_depth() -> int:
+    """Get scan_depth from Jupyter config, default 7."""
+    try:
+        from .manager import VEnvKernelSpecManager
+        manager = VEnvKernelSpecManager()
+        return manager.scan_depth
+    except Exception:
+        return 7
 
 
 def find_jupyter_config_dir():
@@ -188,15 +281,26 @@ Usage:
 Commands:
   register <path>     Register an environment for kernel discovery
   unregister <path>   Remove an environment from kernel discovery
+  scan [path]         Scan directory for environments and register them
   list                List all registered environments
   config enable       Enable VEnvKernelSpecManager in Jupyter config
   config disable      Disable VEnvKernelSpecManager in Jupyter config
   config show         Show current config location and status
 
+Options:
+  scan --depth N      Maximum directory depth to scan (default: 5)
+
+Notes:
+  - scan and register also cleanup non-existent environments from registries
+  - conda environments found during scan are reported but not registered
+    (they are discovered automatically via conda env list)
+
 Examples:
+  nb_venv_kernels scan                    # Scan current directory
+  nb_venv_kernels scan /path/to/projects  # Scan specific directory
+  nb_venv_kernels scan --depth 3          # Limit scan depth
   nb_venv_kernels register /path/to/.venv
   nb_venv_kernels list
-  nb_venv_kernels config enable
 """)
 
 
@@ -241,6 +345,24 @@ def main():
         help="List all registered environments",
     )
 
+    # scan command
+    scan_parser = subparsers.add_parser(
+        "scan",
+        help="Scan directory for environments and register them",
+    )
+    scan_parser.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        help="Directory to scan (default: current directory)",
+    )
+    scan_parser.add_argument(
+        "--depth",
+        type=int,
+        default=None,
+        help="Maximum directory depth to scan (default: from config, usually 5)",
+    )
+
     # config command
     config_parser = subparsers.add_parser(
         "config",
@@ -264,6 +386,14 @@ def main():
         sys.exit(0)
 
     if args.command == "register":
+        # Cleanup non-existent environments first
+        cleanup_result = cleanup_registries()
+        if cleanup_result["removed"]:
+            print("Cleaned up non-existent environments:")
+            for path in cleanup_result["removed"]:
+                print(f"  - {path}")
+            print()
+
         try:
             if register_environment(args.path):
                 print(f"Registered: {args.path}")
@@ -284,15 +414,90 @@ def main():
     elif args.command == "list":
         envs = list_environments()
         if not envs:
-            print("No environments registered.")
-            print("Use 'nb_venv_kernels register <path>' to register an environment.")
+            print("No environments found.")
+            print("Use 'nb_venv_kernels register <path>' or 'nb_venv_kernels scan' to add environments.")
         else:
-            print(f"{'PATH':<60} {'EXISTS':<8} {'KERNEL':<8}")
-            print("-" * 76)
+            # Sort: conda global first, then conda local, uv, venv; by name within each
+            def sort_key(e):
+                env_type = e.get("type", "venv")
+                name = _get_env_display_name(e["path"], env_type).lower()
+                if env_type == "conda":
+                    if _is_conda_global(e["path"]):
+                        return (0, name)  # conda global first
+                    return (1, name)  # conda local
+                elif env_type == "uv":
+                    return (2, name)
+                else:
+                    return (3, name)  # venv
+
+            envs.sort(key=sort_key)
+
+            print(f"{'NAME':<25} {'TYPE':<16} {'EXISTS':<8} {'KERNEL':<8} {'PATH'}")
+            print("-" * 110)
             for env in envs:
+                name = _get_env_display_name(env['path'], env.get("type", "venv"))
+                env_type = _get_env_type_display(env['path'], env.get("type", "venv"))
                 exists = "yes" if env["exists"] else "NO"
                 kernel = "yes" if env["has_kernel"] else "no"
-                print(f"{env['path']:<60} {exists:<8} {kernel:<8}")
+                print(f"{name:<25} {env_type:<16} {exists:<8} {kernel:<8} {env['path']}")
+        print()
+
+    elif args.command == "scan":
+        scan_path = os.path.abspath(args.path)
+        # Use configured depth if not specified via CLI
+        depth = args.depth if args.depth is not None else _get_configured_scan_depth()
+        spinner = Spinner(f"Scanning {scan_path}")
+
+        try:
+            spinner.start()
+            result = scan_directory(scan_path, max_depth=depth)
+            spinner.stop()
+        except ValueError as e:
+            spinner.stop()
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        # Report removed (non-existent) environments
+        if result["removed"]:
+            print("Removed non-existent environments:")
+            for path in result["removed"]:
+                print(f"  - {path}")
+            print()
+
+        # Report newly registered environments in a table
+        if result["registered"]:
+            print(f"{'REGISTERED':<60} {'TYPE':<8}")
+            print("-" * 68)
+            for path in result["registered"]:
+                # Detect type
+                from .registry import is_uv_environment
+                env_type = "uv" if is_uv_environment(path) else "venv"
+                print(f"{path:<60} {env_type:<8}")
+            print()
+
+        # Report conda environments found (not registered)
+        if result["conda_found"]:
+            print("Conda environments found (discovered automatically via conda):")
+            for path in result["conda_found"]:
+                print(f"  - {path}")
+            print()
+
+        # Summary
+        total = len(result["registered"])
+        removed = len(result["removed"])
+        conda = len(result["conda_found"])
+
+        if total == 0 and removed == 0 and conda == 0:
+            print("No new environments found.")
+        else:
+            parts = []
+            if total > 0:
+                parts.append(f"{total} registered")
+            if removed > 0:
+                parts.append(f"{removed} removed")
+            if conda > 0:
+                parts.append(f"{conda} conda found")
+            print(f"Summary: {', '.join(parts)}")
         print()
 
     elif args.command == "config":

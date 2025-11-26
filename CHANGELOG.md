@@ -2,6 +2,33 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.1.0
+
+### New Features
+
+- **Scan command**: `nb_venv_kernels scan` finds venv/uv environments in directory trees
+  - Animated spinner during scanning
+  - Configurable depth via `--depth` or `c.VEnvKernelSpecManager.scan_depth` (default: 7)
+  - Automatically cleans up non-existent environments from registries
+  - Skips common non-environment directories (node_modules, __pycache__, .git, etc.)
+
+- **Enhanced list command**: Shows all environment types (conda, uv, venv)
+  - Columns: NAME, TYPE, EXISTS, KERNEL, PATH
+  - TYPE shows `conda (global)`, `conda (local)`, `uv`, `venv`
+  - Sorted by type (conda global first) then by name
+  - Names derived from project directories
+
+- **Registry cleanup**: Both `scan` and `register` commands remove non-existent environments
+
+### Configuration
+
+- Added `c.VEnvKernelSpecManager.scan_depth = 7` setting for default scan depth
+
+### Documentation
+
+- Updated mermaid diagram to show CLI scan/register populating registries
+- Added "Listing Environments" section to README with example output
+
 ## 1.0.8
 
 - Separate registries: `~/.venv/environments.txt` for venv, `~/.uv/environments.txt` for uv
