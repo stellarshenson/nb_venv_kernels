@@ -22,11 +22,20 @@ Use Python virtual environments as Jupyter kernels. Discovers and registers kern
 
 ## Install
 
+This package should be installed in the environment from which you run Jupyter Notebook or JupyterLab. This might be your base conda environment, but it need not be. For instance, if you have a dedicated `jupyter_env` environment:
+
+```bash
+conda activate jupyter_env
+pip install nb_venv_kernels
+```
+
+Or install directly with pip/uv if not using conda:
+
 ```bash
 pip install nb_venv_kernels
 ```
 
-The extension installs itself as the default kernel spec manager via `jupyter_config.json`. If nb_conda_kernels is installed, nb_venv_kernels takes precedence and includes all conda kernel discovery functionality.
+The extension auto-enables as the default kernel spec manager via `jupyter_config.json`. If nb_conda_kernels is installed, nb_venv_kernels takes precedence and includes all conda kernel discovery functionality.
 
 ## Usage
 
