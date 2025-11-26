@@ -251,6 +251,40 @@ class VEnvKernelSpecManager(KernelSpecManager):
             return {}
         return self._conda_manager._conda_kspecs
 
+    def _get_kernel_sort_key(self, kernel_name):
+        """Return sort key for kernel ordering.
+
+        Priority order:
+        0 - Current environment (marked with *)
+        1 - Conda kernels
+        2 - UV kernels
+        3 - Venv kernels
+        4 - System kernels
+        """
+        # Check if current environment (venv/uv)
+        venv_spec = self._venv_kspecs.get(kernel_name)
+        if venv_spec:
+            metadata = getattr(venv_spec, 'metadata', {}) or {}
+            if metadata.get('venv_is_currently_running'):
+                return (0, kernel_name)
+            source = metadata.get('venv_source', 'venv')
+            if source == 'uv':
+                return (2, kernel_name)
+            return (3, kernel_name)
+
+        # Check if conda kernel
+        if _HAS_CONDA and not self.venv_only:
+            if kernel_name in self._conda_kspecs:
+                # Check if current conda env
+                conda_spec = self._conda_kspecs[kernel_name]
+                display_name = getattr(conda_spec, 'display_name', '')
+                if display_name.endswith(' *'):
+                    return (0, kernel_name)
+                return (1, kernel_name)
+
+        # System kernel
+        return (4, kernel_name)
+
     def find_kernel_specs(self):
         """Returns a dict mapping kernel names to resource directories."""
         if self.venv_only:
@@ -287,7 +321,9 @@ class VEnvKernelSpecManager(KernelSpecManager):
         if allow:
             kspecs = {k: v for k, v in kspecs.items() if k in allow}
 
-        return kspecs
+        # Sort kernels: current first, then conda, uv, venv, system
+        sorted_names = sorted(kspecs.keys(), key=self._get_kernel_sort_key)
+        return {name: kspecs[name] for name in sorted_names}
 
     def get_kernel_spec(self, kernel_name):
         """Returns a KernelSpec instance for the given kernel_name."""
