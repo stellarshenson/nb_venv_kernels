@@ -2,6 +2,14 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.1.35
+
+### Cache Coherence
+
+- API routes now use server's kernel spec manager singleton when available
+- Scan/register/unregister operations invalidate server cache immediately
+- New kernels appear in kernel picker without page refresh
+
 ## 1.1.33
 
 ### JupyterLab Command Palette

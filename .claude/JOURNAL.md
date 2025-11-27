@@ -123,3 +123,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 40. **Task - Command palette integration**: Added scan command to JupyterLab command palette and UI tests<br>
     **Result**: Refactored index.ts with SCAN_COMMAND constant and executeScanCommand function, registered command with app.commands.addCommand(), added to command palette under "Kernel" category via ICommandPalette. Added two Galata UI tests: command registration verification and command palette search test
+
+41. **Task - Immediate kernel recognition**: API routes now use server's kernel spec manager singleton for cache coherence<br>
+    **Result**: Added get_venv_manager() helper that returns server's VEnvKernelSpecManager instance if configured, otherwise falls back to new instance. Scan/register/unregister operations now invalidate the actual server cache, making new kernels appear immediately in kernel picker

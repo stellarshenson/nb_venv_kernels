@@ -13,12 +13,26 @@ from .manager import (
 )
 
 
+def get_venv_manager(handler):
+    """Get VEnvKernelSpecManager, using server's instance if available.
+
+    Uses server's kernel_spec_manager if it's a VEnvKernelSpecManager,
+    otherwise creates a new instance (for testing or non-configured servers).
+    """
+    ksm = handler.kernel_spec_manager
+    if isinstance(ksm, VEnvKernelSpecManager):
+        return ksm
+    # Fallback for tests or when not configured as kernel_spec_manager_class
+    return VEnvKernelSpecManager()
+
+
 class ListEnvironmentsHandler(APIHandler):
     """List all registered environments."""
 
     @tornado.web.authenticated
     def get(self):
-        manager = VEnvKernelSpecManager()
+        # Use server's kernel spec manager for immediate cache coherence
+        manager = get_venv_manager(self)
         envs = manager.list_environments()
         # Use server's root_dir setting, fall back to get_workspace_root()
         workspace = self.settings.get("server_root_dir") or get_workspace_root()
@@ -55,7 +69,8 @@ class ScanEnvironmentsHandler(APIHandler):
             }))
             return
 
-        manager = VEnvKernelSpecManager()
+        # Use server's kernel spec manager for immediate cache coherence
+        manager = get_venv_manager(self)
         result = manager.scan_environments(path=path, max_depth=depth, dry_run=dry_run)
 
         # Convert paths to relative
@@ -79,7 +94,8 @@ class RegisterEnvironmentHandler(APIHandler):
             self.finish(json.dumps({"error": "path is required"}))
             return
 
-        manager = VEnvKernelSpecManager()
+        # Use server's kernel spec manager for immediate cache coherence
+        manager = get_venv_manager(self)
         result = manager.register_environment(path)
         self.finish(json.dumps(result))
 
@@ -97,7 +113,8 @@ class UnregisterEnvironmentHandler(APIHandler):
             self.finish(json.dumps({"error": "path is required"}))
             return
 
-        manager = VEnvKernelSpecManager()
+        # Use server's kernel spec manager for immediate cache coherence
+        manager = get_venv_manager(self)
         result = manager.unregister_environment(path)
         self.finish(json.dumps(result))
 
