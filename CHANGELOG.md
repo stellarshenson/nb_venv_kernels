@@ -2,6 +2,25 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.1.42
+
+### Workspace Boundary Validation
+
+- Registration now validates path is within server workspace
+- Prevents registering arbitrary system paths
+- Global conda installations exempt (anaconda, miniconda, miniforge, etc.)
+- Environments listed in `conda env list` also exempt
+
+### Security
+
+- Only actual system conda installations bypass workspace check
+- Random directories with `conda-meta` in /tmp no longer exempt
+- Added `is_global_conda_environment()` function for proper validation
+
+### CI/CD
+
+- Fixed CI test to create venv in workspace instead of /tmp
+
 ## 1.1.35
 
 ### Cache Coherence
