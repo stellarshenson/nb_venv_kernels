@@ -53,10 +53,10 @@ jobs:
         # Test CLI commands
         nb_venv_kernels list
 
-        # Create test venv and register
-        python -m venv /tmp/test-venv
-        /tmp/test-venv/bin/pip install ipykernel
-        nb_venv_kernels register /tmp/test-venv
+        # Create test venv in workspace and register
+        python -m venv .test-venv
+        .test-venv/bin/pip install ipykernel
+        nb_venv_kernels register .test-venv
         nb_venv_kernels list | grep -i test-venv
 
         # Verify kernel discovery
@@ -68,9 +68,10 @@ jobs:
         assert any('test-venv' in k for k in specs.keys()), 'test-venv kernel not found'
         "
 
-        # Unregister
-        nb_venv_kernels unregister /tmp/test-venv
+        # Unregister and cleanup
+        nb_venv_kernels unregister .test-venv
         nb_venv_kernels list | grep -v test-venv || true
+        rm -rf .test-venv
 
     - name: Package the extension
       run: |

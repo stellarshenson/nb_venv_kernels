@@ -135,3 +135,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 44. **Task - CLI workspace boundary validation**: Added workspace validation to CLI register command<br>
     **Result**: CLI register now validates path is within workspace (conda environments exempt). Added test_register_outside_workspace_denied test to verify API validation works
+
+45. **Task - Restrict conda exemption to global installations**: Fixed workspace boundary to only exempt actual global conda installations<br>
+    **Result**: Added is_global_conda_environment() function that checks for known conda base names (anaconda, miniconda, etc.) or environments listed in conda env list. Random directories with conda-meta in /tmp are now properly denied
