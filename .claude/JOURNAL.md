@@ -126,3 +126,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 41. **Task - Immediate kernel recognition**: API routes now use server's kernel spec manager singleton for cache coherence<br>
     **Result**: Added get_venv_manager() helper that returns server's VEnvKernelSpecManager instance if configured, otherwise falls back to new instance. Scan/register/unregister operations now invalidate the actual server cache, making new kernels appear immediately in kernel picker
+
+42. **Task - Workspace boundary for registration**: Added validation to prevent registering environments outside workspace<br>
+    **Result**: Register endpoint now validates path is within workspace, returning 400 error if not. Global conda environments (detected via conda-meta directory) are exempt from this restriction
