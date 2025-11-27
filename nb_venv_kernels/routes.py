@@ -94,6 +94,19 @@ class RegisterEnvironmentHandler(APIHandler):
             self.finish(json.dumps({"error": "path is required"}))
             return
 
+        # Expand and resolve path
+        path = os.path.abspath(os.path.expanduser(path))
+
+        # Validate path is within workspace
+        workspace = self.settings.get("server_root_dir") or get_workspace_root()
+        workspace = os.path.expanduser(workspace)
+        if not is_path_within_workspace(path, workspace):
+            self.set_status(400)
+            self.finish(json.dumps({
+                "error": f"Environment path must be within workspace: {workspace}"
+            }))
+            return
+
         # Use server's kernel spec manager for immediate cache coherence
         manager = get_venv_manager(self)
         result = manager.register_environment(path)
