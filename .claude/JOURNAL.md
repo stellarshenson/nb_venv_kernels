@@ -129,3 +129,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 42. **Task - Workspace boundary for registration**: Added validation to prevent registering environments outside workspace<br>
     **Result**: Register endpoint now validates path is within workspace, returning 400 error if not. Global conda environments (detected via conda-meta directory) are exempt from this restriction
+
+43. **Task - Documentation updates for v1.1.37**: Updated API.md and NB_VENV_KERNELS_MECHANICS.md with new features<br>
+    **Result**: Added cache coherence note, workspace boundary validation section, command palette access info. Updated version references to 1.1.37
