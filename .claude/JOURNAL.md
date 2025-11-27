@@ -138,3 +138,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 45. **Task - Restrict conda exemption to global installations**: Fixed workspace boundary to only exempt actual global conda installations<br>
     **Result**: Added is_global_conda_environment() function that checks for known conda base names (anaconda, miniconda, etc.) or environments listed in conda env list. Random directories with conda-meta in /tmp are now properly denied
+
+46. **Task - Frontend kernel spec refresh**: Added immediate kernel picker update after scan completes<br>
+    **Result**: Captured app.serviceManager.kernelspecs in plugin activate function, call refreshSpecs() after showing scan results. New kernels now appear immediately in kernel picker without page refresh

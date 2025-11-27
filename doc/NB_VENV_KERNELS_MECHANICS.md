@@ -1,6 +1,6 @@
 # nb_venv_kernels - Environment Discovery Mechanism
 
-@nb_venv_kernels version: 1.1.36<br>
+@nb_venv_kernels version: 1.1.43<br>
 @created on: 2025-11-27
 
 This document describes how nb_venv_kernels discovers and presents venv/uv environments as Jupyter kernels.
@@ -273,15 +273,22 @@ Cache invalidation occurs after:
 
 API routes use the server's kernel spec manager singleton when available, ensuring cache invalidation affects the kernel picker immediately without page refresh.
 
+The JupyterLab extension calls `refreshSpecs()` on the frontend kernel spec manager after scan operations complete, triggering an immediate re-fetch of kernel specs from the server.
+
 ## Workspace Boundary Validation
 
-Registration via the API enforces workspace boundaries:
+Registration via both API and CLI enforces workspace boundaries:
 
 - Environments must be within the server's workspace root
-- Global conda environments (detected via `conda-meta` directory) are exempt
+- Global conda environments are exempt from this restriction
 - Scan operations are also restricted to workspace boundaries
 
-This prevents registration of arbitrary system paths while allowing legitimate conda installations.
+Global conda environment detection uses `is_global_conda_environment()` which validates:
+
+1. Directory contains `conda-meta` (is a conda environment)
+2. Either the base directory name matches known conda base names (anaconda, miniconda, miniforge, mambaforge, etc.) OR the path is listed in `conda env list`
+
+This prevents registration of arbitrary system paths while allowing legitimate conda installations. Random directories with `conda-meta` (e.g., in /tmp) are not exempt.
 
 ## Configuration Options
 

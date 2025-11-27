@@ -7,8 +7,13 @@ import { IMainMenu } from '@jupyterlab/mainmenu';
 import { ICommandPalette } from '@jupyterlab/apputils';
 import { Dialog, showDialog } from '@jupyterlab/apputils';
 import { URLExt } from '@jupyterlab/coreutils';
-import { ServerConnection } from '@jupyterlab/services';
+import { ServerConnection, KernelSpec } from '@jupyterlab/services';
 import { Widget } from '@lumino/widgets';
+
+/**
+ * Module-level reference to kernel spec manager for refreshing after scan
+ */
+let kernelSpecManager: KernelSpec.IManager | null = null;
 
 interface IScanEnvironment {
   action: string;
@@ -243,6 +248,11 @@ async function executeScanCommand(): Promise<void> {
     const result = await scanEnvironments();
     loadingDialog.dispose();
     await showScanResults(result);
+
+    // Refresh kernel specs so new kernels appear immediately in kernel picker
+    if (kernelSpecManager) {
+      await kernelSpecManager.refreshSpecs();
+    }
   } catch (error) {
     loadingDialog.dispose();
     console.error('Scan failed:', error);
@@ -268,6 +278,9 @@ const plugin: JupyterFrontEndPlugin<void> = {
     palette: ICommandPalette | null
   ) => {
     console.log('JupyterLab extension nb_venv_kernels is activated!');
+
+    // Capture kernel spec manager for refreshing after scan
+    kernelSpecManager = app.serviceManager.kernelspecs;
 
     // Register scan command
     app.commands.addCommand(SCAN_COMMAND, {
