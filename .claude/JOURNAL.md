@@ -132,3 +132,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 43. **Task - Documentation updates for v1.1.37**: Updated API.md and NB_VENV_KERNELS_MECHANICS.md with new features<br>
     **Result**: Added cache coherence note, workspace boundary validation section, command palette access info. Updated version references to 1.1.37
+
+44. **Task - CLI workspace boundary validation**: Added workspace validation to CLI register command<br>
+    **Result**: CLI register now validates path is within workspace (conda environments exempt). Added test_register_outside_workspace_denied test to verify API validation works
