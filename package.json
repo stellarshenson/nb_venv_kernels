@@ -1,6 +1,6 @@
 {
     "name": "nb_venv_kernels",
-    "version": "1.1.31",
+    "version": "1.1.33",
     "description": "Jupyterlab extension to detect notebook kernels similarly to how nb_conda_kernel does",
     "keywords": [
         "jupyter",

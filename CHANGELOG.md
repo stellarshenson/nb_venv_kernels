@@ -2,6 +2,20 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.1.33
+
+### JupyterLab Command Palette
+
+- Added scan command to JupyterLab command palette under "Kernel" category
+- Refactored menu command to use proper command registration pattern
+- Command accessible via Ctrl+Shift+C -> "Scan for Python Environments"
+
+### Testing
+
+- Added UI tests for scan command registration and command palette integration
+- Tests verify command is registered in app.commands
+- Tests verify command appears in command palette search results
+
 ## 1.1.20
 
 ### CLI/API Harmonization

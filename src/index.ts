@@ -4,6 +4,7 @@ import {
 } from '@jupyterlab/application';
 
 import { IMainMenu } from '@jupyterlab/mainmenu';
+import { ICommandPalette } from '@jupyterlab/apputils';
 import { Dialog, showDialog } from '@jupyterlab/apputils';
 import { URLExt } from '@jupyterlab/coreutils';
 import { ServerConnection } from '@jupyterlab/services';
@@ -228,44 +229,64 @@ async function showScanResults(result: IScanResult): Promise<void> {
 }
 
 /**
+ * Command ID for scanning environments
+ */
+const SCAN_COMMAND = 'nb_venv_kernels:scan';
+
+/**
+ * Execute the scan command - scans workspace for Python environments
+ */
+async function executeScanCommand(): Promise<void> {
+  const loadingDialog = showLoadingDialog();
+
+  try {
+    const result = await scanEnvironments();
+    loadingDialog.dispose();
+    await showScanResults(result);
+  } catch (error) {
+    loadingDialog.dispose();
+    console.error('Scan failed:', error);
+    await showDialog({
+      title: 'Scan Failed',
+      body: `Failed to scan environments: ${error}`,
+      buttons: [Dialog.okButton()]
+    });
+  }
+}
+
+/**
  * Initialization data for the nb_venv_kernels extension.
  */
 const plugin: JupyterFrontEndPlugin<void> = {
   id: 'nb_venv_kernels:plugin',
   description: 'Discovers Jupyter kernels from conda, venv, and uv environments',
   autoStart: true,
-  optional: [IMainMenu],
-  activate: (app: JupyterFrontEnd, mainMenu: IMainMenu | null) => {
+  optional: [IMainMenu, ICommandPalette],
+  activate: (
+    app: JupyterFrontEnd,
+    mainMenu: IMainMenu | null,
+    palette: ICommandPalette | null
+  ) => {
     console.log('JupyterLab extension nb_venv_kernels is activated!');
 
-    // Add command to scan environments
-    const commandId = 'nb_venv_kernels:scan';
-    app.commands.addCommand(commandId, {
+    // Register scan command
+    app.commands.addCommand(SCAN_COMMAND, {
       label: 'Scan for Python Environments',
       caption: 'Scan workspace for venv/uv/conda environments',
-      execute: async () => {
-        // Show loading spinner
-        const loadingDialog = showLoadingDialog();
-
-        try {
-          const result = await scanEnvironments();
-          loadingDialog.dispose();
-          await showScanResults(result);
-        } catch (error) {
-          loadingDialog.dispose();
-          console.error('Scan failed:', error);
-          await showDialog({
-            title: 'Scan Failed',
-            body: `Failed to scan environments: ${error}`,
-            buttons: [Dialog.okButton()]
-          });
-        }
-      }
+      execute: executeScanCommand
     });
 
-    // Add to Kernel menu if available
+    // Add to Kernel menu
     if (mainMenu) {
-      mainMenu.kernelMenu.addGroup([{ command: commandId }], 100);
+      mainMenu.kernelMenu.addGroup([{ command: SCAN_COMMAND }], 100);
+    }
+
+    // Add to command palette
+    if (palette) {
+      palette.addItem({
+        command: SCAN_COMMAND,
+        category: 'Kernel'
+      });
     }
   }
 };
