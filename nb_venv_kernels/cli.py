@@ -13,6 +13,7 @@ from .manager import (
     is_path_within_workspace,
     path_relative_to_workspace,
 )
+from .registry import is_global_conda_environment
 
 
 class Colors:
@@ -448,13 +449,12 @@ def main():
     manager = VEnvKernelSpecManager()
 
     if args.command == "register":
-        # Validate path is within workspace (conda environments exempt)
+        # Validate path is within workspace (global conda environments exempt)
         abs_path = os.path.abspath(os.path.expanduser(args.path))
         workspace = get_workspace_root()
         if not abs_path.startswith(workspace + os.sep) and abs_path != workspace:
-            # Check if it's a conda environment (exempt from workspace restriction)
-            conda_meta = os.path.join(abs_path, "conda-meta")
-            if not os.path.isdir(conda_meta):
+            # Check if it's a global conda environment (exempt from workspace restriction)
+            if not is_global_conda_environment(abs_path):
                 error_msg = f"Environment path must be within workspace: {workspace}"
                 if getattr(args, 'json', False):
                     print(json.dumps({"path": abs_path, "registered": False, "error": error_msg}, indent=2))

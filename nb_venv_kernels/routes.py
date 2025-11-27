@@ -11,7 +11,7 @@ from .manager import (
     is_path_within_workspace,
     path_relative_to_workspace,
 )
-from .registry import is_conda_environment
+from .registry import is_global_conda_environment
 
 
 def get_venv_manager(handler):
@@ -98,10 +98,10 @@ class RegisterEnvironmentHandler(APIHandler):
         # Expand and resolve path
         path = os.path.abspath(os.path.expanduser(path))
 
-        # Validate path is within workspace (conda environments exempt)
+        # Validate path is within workspace (global conda environments exempt)
         workspace = self.settings.get("server_root_dir") or get_workspace_root()
         workspace = os.path.expanduser(workspace)
-        if not is_path_within_workspace(path, workspace) and not is_conda_environment(path):
+        if not is_path_within_workspace(path, workspace) and not is_global_conda_environment(path):
             self.set_status(400)
             self.finish(json.dumps({
                 "error": f"Environment path must be within workspace: {workspace}"

@@ -345,6 +345,35 @@ def is_conda_environment(path: str) -> bool:
     return os.path.isdir(os.path.join(path, "conda-meta"))
 
 
+def is_global_conda_environment(path: str) -> bool:
+    """Check if path is a global/system conda environment.
+
+    Only returns True for:
+    - Known conda base installations (anaconda, miniconda, etc.)
+    - Environments listed in conda env list or ~/.conda/environments.txt
+
+    Does NOT return True for random directories that happen to have conda-meta.
+    """
+    if not is_conda_environment(path):
+        return False
+
+    abs_path = os.path.abspath(path)
+
+    # Check if it's a known conda base installation
+    basename = os.path.basename(abs_path).lower()
+    base_names = {"conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
+                  "miniforge", "miniforge3", "mambaforge", "mambaforge3"}
+    if basename in base_names:
+        return True
+
+    # Check if it's listed in conda's known environments
+    known_conda_envs = set(get_conda_environments())
+    if abs_path in known_conda_envs:
+        return True
+
+    return False
+
+
 def scan_directory(root_path: str, max_depth: int = 7,
                    dry_run: bool = False) -> Dict[str, List]:
     """Scan directory tree for virtual environments.
