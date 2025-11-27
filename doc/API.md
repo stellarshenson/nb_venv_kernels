@@ -1,11 +1,13 @@
 # nb_venv_kernels API Reference
 
-@nb_venv_kernels version: 1.1.31<br>
+@nb_venv_kernels version: 1.1.36<br>
 @created on: 2025-11-27
 
 ## REST API Endpoints
 
 All endpoints require authentication via Jupyter server token.
+
+**Cache Coherence**: API operations use the server's kernel spec manager singleton, so scan/register/unregister changes appear immediately in the kernel picker without page refresh.
 
 ### List Environments
 
@@ -124,6 +126,8 @@ Register a single environment for kernel discovery.
 - `registered` - True if newly registered, false if already existed
 - `error` - Error message if registration failed, null otherwise
 
+**Workspace Boundary**: Path must be within the server's workspace root. Returns 400 error if outside workspace. Global conda environments (with `conda-meta` directory) are exempt from this restriction.
+
 ### Unregister Environment
 
 **POST** `/nb-venv-kernels/unregister`
@@ -224,8 +228,15 @@ nb_venv_kernels scan /path/to/workspace --no-update
 
 ## JupyterLab Integration
 
-The extension adds a "Scan for Python Environments" command to the Kernel menu. When triggered, it scans the workspace and displays results in a modal dialog showing:
+The extension adds a "Scan for Python Environments" command accessible via:
+
+- **Kernel menu** - Scan for Python Environments
+- **Command palette** (Ctrl+Shift+C) - search "Scan for Python"
+
+When triggered, it scans the workspace and displays results in a modal dialog showing:
 
 - Environments found (action: add, keep, remove)
 - Summary counts
 - Color-coded actions (green=add, blue=keep, orange=remove)
+
+New kernels appear immediately in the kernel picker after scan completes.
