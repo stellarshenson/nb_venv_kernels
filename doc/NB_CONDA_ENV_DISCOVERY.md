@@ -1,5 +1,8 @@
 # nb_conda_kernels - Environment Discovery Mechanism
 
+@nb_venv_kernels version: 1.1.31<br>
+@created on: 2025-11-27
+
 This document describes how nb_conda_kernels discovers and presents conda environments as Jupyter kernels.
 
 ## Overview

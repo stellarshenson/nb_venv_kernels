@@ -1,5 +1,8 @@
 # Integration Tests
 
+@nb_venv_kernels version: 1.1.31<br>
+@created on: 2025-11-27
+
 This document describes the test suite for nb_venv_kernels, covering kernel discovery, environment registry operations, and API functionality.
 
 ## Test Structure

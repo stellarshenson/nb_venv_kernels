@@ -130,6 +130,8 @@ The `register` command auto-detects uv environments via `pyvenv.cfg` and writes 
 
 ## How It Works
 
+Environment registration and kernel discovery flow:
+
 ```mermaid
 flowchart LR
     subgraph CLI
@@ -176,11 +178,48 @@ flowchart LR
     style JL stroke:#0284c7,stroke-width:3px
 ```
 
+CLI and JupyterLab interface architecture:
+
+```mermaid
+flowchart LR
+    subgraph Interfaces
+        CLI[nb_venv_kernels CLI]
+        MENU[JupyterLab Kernel Menu]
+    end
+
+    subgraph Server[Jupyter Server]
+        REST[REST Endpoints<br>/nb-venv-kernels/*]
+    end
+
+    MGR[VEnvKernelSpecManager]
+
+    subgraph Storage
+        VENV_REG[~/.venv/environments.txt]
+        UV_REG[~/.uv/environments.txt]
+    end
+
+    CLI -->|direct| MGR
+    MENU -->|api| REST
+    REST --> MGR
+    MGR --> VENV_REG
+    MGR --> UV_REG
+
+    style CLI stroke:#10b981,stroke-width:2px
+    style MENU stroke:#0284c7,stroke-width:2px
+    style REST stroke:#f59e0b,stroke-width:2px
+    style MGR stroke:#3b82f6,stroke-width:3px
+    style VENV_REG stroke:#10b981,stroke-width:2px
+    style UV_REG stroke:#a855f7,stroke-width:2px
+```
+
 - Scans `{path}/share/jupyter/kernels/*/kernel.json` for each registered environment
 - Configures kernel to use venv's python directly with `VIRTUAL_ENV` and `PATH` environment variables
 - Kernel order: current environment first, then conda, uv, venv, system
 - Caches results for 60 seconds
 - `config enable` backs up existing config, `config disable` restores from backup
+- CLI calls VEnvKernelSpecManager directly; JupyterLab frontend uses REST endpoints
+
+For detailed technical documentation, see [Environment Discovery Mechanism](doc/NB_VENV_KERNELS_MECHANICS.md).
 
 ## Configuration
 
@@ -202,40 +241,6 @@ The extension provides REST and Python APIs for integration with tools and autom
 - **REST endpoints** - /nb-venv-kernels/environments, /scan, /register, /unregister
 - **Python API** - VEnvKernelSpecManager methods for listing, scanning, and registering environments
 - **JSON output** - CLI commands support `--json` flag for machine-to-machine communication
-
-```mermaid
-flowchart LR
-    subgraph Interfaces
-        CLI[nb_venv_kernels CLI]
-        MENU[JupyterLab Kernel Menu]
-    end
-
-    subgraph Server[Jupyter Server]
-        REST[REST Endpoints<br>/nb-venv-kernels/*]
-    end
-
-    MGR[VEnvKernelSpecManager]
-
-    subgraph Storage
-        VENV_REG[~/.venv/environments.txt]
-        UV_REG[~/.uv/environments.txt]
-    end
-
-    CLI --> MGR
-    MENU --> REST
-    REST --> MGR
-    MGR --> VENV_REG
-    MGR --> UV_REG
-
-    style CLI stroke:#10b981,stroke-width:2px
-    style MENU stroke:#0284c7,stroke-width:2px
-    style REST stroke:#f59e0b,stroke-width:2px
-    style MGR stroke:#3b82f6,stroke-width:3px
-    style VENV_REG stroke:#10b981,stroke-width:2px
-    style UV_REG stroke:#a855f7,stroke-width:2px
-```
-
-CLI calls VEnvKernelSpecManager directly. JupyterLab frontend uses REST endpoints. Both produce identical sorted output.
 
 ## Uninstall
 

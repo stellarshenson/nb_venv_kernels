@@ -1,5 +1,8 @@
 # nb_venv_kernels - Environment Discovery Mechanism
 
+@nb_venv_kernels version: 1.1.31<br>
+@created on: 2025-11-27
+
 This document describes how nb_venv_kernels discovers and presents venv/uv environments as Jupyter kernels.
 
 ## Overview

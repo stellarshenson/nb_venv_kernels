@@ -1,5 +1,8 @@
 # nb_venv_kernels API Reference
 
+@nb_venv_kernels version: 1.1.31<br>
+@created on: 2025-11-27
+
 ## REST API Endpoints
 
 All endpoints require authentication via Jupyter server token.
