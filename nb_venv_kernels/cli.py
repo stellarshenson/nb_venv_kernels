@@ -448,6 +448,20 @@ def main():
     manager = VEnvKernelSpecManager()
 
     if args.command == "register":
+        # Validate path is within workspace (conda environments exempt)
+        abs_path = os.path.abspath(os.path.expanduser(args.path))
+        workspace = get_workspace_root()
+        if not abs_path.startswith(workspace + os.sep) and abs_path != workspace:
+            # Check if it's a conda environment (exempt from workspace restriction)
+            conda_meta = os.path.join(abs_path, "conda-meta")
+            if not os.path.isdir(conda_meta):
+                error_msg = f"Environment path must be within workspace: {workspace}"
+                if getattr(args, 'json', False):
+                    print(json.dumps({"path": abs_path, "registered": False, "error": error_msg}, indent=2))
+                else:
+                    print(f"Error: {error_msg}", file=sys.stderr)
+                sys.exit(1)
+
         result = manager.register_environment(args.path)
 
         if getattr(args, 'json', False):
