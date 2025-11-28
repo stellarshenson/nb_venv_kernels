@@ -147,3 +147,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 48. **Task - CLI v1.1.46 completion**: Added version flag, unregister by name, fixed custom name display<br>
     **Result**: Added `--version` flag to CLI. Added `-n/--name` to unregister command to remove by custom name. Fixed manager.list_environments() and scan to properly use custom names from registry. Fixed tab-separated parsing in cleanup_registries() and scan_directory dry_run mode
+
+49. **Task - Publish v1.1.47**: Published package to PyPI and npm<br>
+    **Result**: Version bumped to 1.1.47, published to both registries via `make publish`
