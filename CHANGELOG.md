@@ -2,6 +2,27 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.6
+
+### Registry Sanitization
+
+- Registry now auto-fixes duplicate custom names in-place when reading
+- Duplicate names detected from manual edits or older versions get `_1`, `_2` suffixes
+- Registry is the single source of truth for unique names
+
+### Thread/Multiprocess Safety
+
+- All registry operations now use file locking via `filelock` package
+- Cross-platform support (Linux, macOS, Windows)
+- Single global lock at `~/.venv/registry.lock` prevents race conditions
+- Added `filelock` as package dependency
+
+### CLI Improvements
+
+- `scan` command now defaults to workspace root when `--path` not specified
+- Path must be provided with `--path` flag (no longer positional argument)
+- CLI list command now uses manager's conflict-resolved names
+
 ## 1.2.4
 
 ### Kernel Display Names

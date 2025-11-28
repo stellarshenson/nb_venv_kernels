@@ -62,8 +62,8 @@ class TestVenvKernelDiscovery:
         )
 
         # Register the environment
-        result = register_environment(venv_path)
-        assert result is True
+        registered, updated = register_environment(venv_path)
+        assert registered is True
 
         # Invalidate cache to pick up new registration
         invalidate_cache(manager)
@@ -399,6 +399,47 @@ class TestKernelSpecDetails:
 
         # Cleanup
         unregister_environment(venv_path)
+
+    def test_kernel_names_unique_with_duplicate_custom_names(self, temp_dir, manager):
+        """Test kernel names are unique even when registry has duplicate custom names."""
+        # Create two venvs with ipykernel
+        venv1_path = os.path.join(temp_dir, "proj1", ".venv")
+        venv2_path = os.path.join(temp_dir, "proj2", ".venv")
+        os.makedirs(os.path.dirname(venv1_path))
+        os.makedirs(os.path.dirname(venv2_path))
+
+        subprocess.run(["python", "-m", "venv", venv1_path], check=True, capture_output=True)
+        subprocess.run(["python", "-m", "venv", venv2_path], check=True, capture_output=True)
+
+        pip1 = os.path.join(venv1_path, "bin", "pip")
+        pip2 = os.path.join(venv2_path, "bin", "pip")
+        subprocess.run([pip1, "install", "ipykernel", "-q"], check=True, capture_output=True)
+        subprocess.run([pip2, "install", "ipykernel", "-q"], check=True, capture_output=True)
+
+        # Register both with same custom name (simulating legacy duplicate)
+        # Note: register_environment now warns and auto-suffixes, but we test _all_envs directly
+        register_environment(venv1_path, name="same-name")
+        register_environment(venv2_path, name="same-name")  # Will become same-name_1
+
+        # Invalidate cache
+        invalidate_cache(manager)
+
+        # Get all envs - should have unique names
+        all_envs = manager._all_envs()
+        env_names = list(all_envs.keys())
+
+        # Should have two different names
+        matching = [n for n in env_names if n.startswith("same-name")]
+        assert len(matching) == 2, f"Expected 2 envs with same-name prefix, got: {matching}"
+        assert len(set(matching)) == 2, f"Expected unique names, got duplicates: {matching}"
+
+        # One should be same-name, other same-name_1
+        assert "same-name" in matching
+        assert "same-name_1" in matching
+
+        # Cleanup
+        unregister_environment(venv1_path)
+        unregister_environment(venv2_path)
 
 
 class TestNameConflictResolution:

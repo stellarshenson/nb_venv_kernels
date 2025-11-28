@@ -331,7 +331,7 @@ Usage:
 Commands:
   register <path>     Register an environment for kernel discovery
   unregister <path>   Remove an environment from kernel discovery
-  scan [path]         Scan directory for environments and register them
+  scan                Scan directory for environments and register them
   list                List all registered environments
   config enable       Enable VEnvKernelSpecManager in Jupyter config
   config disable      Disable VEnvKernelSpecManager in Jupyter config
@@ -339,6 +339,7 @@ Commands:
 
 Options:
   register -n NAME    Custom display name for the environment
+  scan --path PATH    Directory to scan (default: workspace root)
   scan --depth N      Maximum directory depth to scan (default: 7)
   scan --dry-run      Dry run: scan and report without changes
 
@@ -349,10 +350,10 @@ Notes:
   - custom names are stored in registry and used in kernel selector
 
 Examples:
-  nb_venv_kernels scan                    # Scan current directory
-  nb_venv_kernels scan /path/to/projects  # Scan specific directory
-  nb_venv_kernels scan --depth 3          # Limit scan depth
-  nb_venv_kernels scan --dry-run          # Dry run mode
+  nb_venv_kernels scan                          # Scan workspace root
+  nb_venv_kernels scan --path /path/to/projects # Scan specific directory
+  nb_venv_kernels scan --depth 3                # Limit scan depth
+  nb_venv_kernels scan --dry-run                # Dry run mode
   nb_venv_kernels register /path/to/.venv
   nb_venv_kernels register .venv -n "My Project"  # With custom name
   nb_venv_kernels list
@@ -430,10 +431,9 @@ def main():
         help="Scan directory for environments and register them",
     )
     scan_parser.add_argument(
-        "path",
-        nargs="?",
-        default=".",
-        help="Directory to scan (default: current directory)",
+        "--path",
+        default=None,
+        help="Directory to scan (default: workspace root)",
     )
     scan_parser.add_argument(
         "--depth",
@@ -558,10 +558,9 @@ def main():
             # JSON output with workspace-relative paths
             output = []
             for env in envs:
-                custom_name = env.get("custom_name")
                 output.append({
-                    "name": _get_env_display_name(env['path'], env.get("type", "venv"), custom_name),
-                    "custom_name": custom_name,
+                    "name": env["name"],  # Use name from manager (has conflict resolution)
+                    "custom_name": env.get("custom_name"),
                     "type": _get_env_type_display(env['path'], env.get("type", "venv")),
                     "exists": env["exists"],
                     "has_kernel": env["has_kernel"],
@@ -576,8 +575,7 @@ def main():
             print(f"{'name':<30} {'type':<16} {'exists':<8} {'kernel':<8} {'path (relative to workspace)'}")
             print("-" * 110)
             for env in envs:
-                custom_name = env.get("custom_name")
-                name = _get_env_display_name(env['path'], env.get("type", "venv"), custom_name)
+                name = env["name"]  # Use name from manager (has conflict resolution)
                 env_type = _get_env_type_display(env['path'], env.get("type", "venv"))
                 exists = "yes" if env["exists"] else Colors.red("no") + " " * 6
                 kernel = "yes" if env["has_kernel"] else Colors.red("no") + " " * 6
@@ -591,7 +589,8 @@ def main():
 
     elif args.command == "scan":
         workspace = get_workspace_root()
-        scan_path = os.path.abspath(args.path)
+        # Default to workspace root if no path specified
+        scan_path = os.path.abspath(args.path) if args.path else workspace
 
         # Validate scan path is within workspace
         if not is_path_within_workspace(scan_path, workspace):

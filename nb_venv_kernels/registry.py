@@ -8,8 +8,31 @@ Manages two registry files:
 import json
 import os
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict
+
+from filelock import FileLock
+
+
+def _get_registry_lock_path() -> Path:
+    """Return path to the global registry lock file."""
+    return Path.home() / ".venv" / "registry.lock"
+
+
+@contextmanager
+def _registry_lock():
+    """Context manager for registry file locking (thread/multiprocess safe).
+
+    Uses a single global lock for both venv and uv registries to avoid deadlocks.
+    Cross-platform using filelock package.
+    """
+    lock_path = _get_registry_lock_path()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    lock = FileLock(str(lock_path))
+    with lock:
+        yield
 
 
 def get_venv_registry_path() -> Path:
@@ -117,21 +140,97 @@ def read_environments() -> List[str]:
 def read_environments_with_names() -> List[Tuple[str, Optional[str]]]:
     """Read all registered environments with their custom names.
 
+    Sanitizes duplicate names in the registry files by appending _1, _2, etc.
+    If duplicates are found, the registry files are updated in place.
+    Thread/multiprocess safe using file locking.
+
     Returns:
         List of (path, custom_name) tuples. custom_name is None if not set.
         Combines ~/.venv/environments.txt and ~/.uv/environments.txt.
     """
-    environments = []
-    seen = set()
+    with _registry_lock():
+        environments = []
+        seen_paths = set()
+        seen_names = set()
+        updates_needed = {}  # registry_path -> {old_line -> new_line}
 
-    # Read from both registries
-    for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
-        for env_path, custom_name in _read_registry_file(registry_path, include_names=True):
-            if env_path not in seen:
+        # Read from both registries and detect duplicates
+        for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
+            if not registry_path.exists():
+                continue
+
+            with open(registry_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            for line in lines:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+
+                parts = stripped.split('\t', 1)
+                env_path = os.path.abspath(os.path.expanduser(parts[0]))
+                custom_name = parts[1] if len(parts) > 1 else None
+
+                if env_path in seen_paths:
+                    continue  # Skip duplicate paths
+
+                # Check for duplicate names
+                if custom_name and custom_name in seen_names:
+                    unique_name = _make_unique_name(custom_name, seen_names)
+                    # Track update needed
+                    if registry_path not in updates_needed:
+                        updates_needed[registry_path] = {}
+                    updates_needed[registry_path][stripped] = f"{env_path}\t{unique_name}"
+                    custom_name = unique_name
+
+                if custom_name:
+                    seen_names.add(custom_name)
+                seen_paths.add(env_path)
                 environments.append((env_path, custom_name))
-                seen.add(env_path)
 
-    return environments
+        # Apply updates to registry files if needed
+        for registry_path, updates in updates_needed.items():
+            with open(registry_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            new_lines = []
+            for line in lines:
+                stripped = line.strip()
+                if stripped in updates:
+                    new_lines.append(updates[stripped] + "\n")
+                else:
+                    new_lines.append(line)
+
+            with open(registry_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+
+        return environments
+
+
+def _get_all_custom_names() -> set:
+    """Get all custom names currently in use across registries."""
+    names = set()
+    for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
+        if not registry_path.exists():
+            continue
+        with open(registry_path, "r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"):
+                    parts = stripped.split('\t', 1)
+                    if len(parts) > 1:
+                        names.add(parts[1])
+    return names
+
+
+def _make_unique_name(name: str, existing_names: set) -> str:
+    """Make a name unique by appending _1, _2, etc. if needed."""
+    if name not in existing_names:
+        return name
+    suffix = 1
+    while f"{name}_{suffix}" in existing_names:
+        suffix += 1
+    return f"{name}_{suffix}"
 
 
 def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[bool, bool]:
@@ -139,6 +238,8 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
 
     Auto-detects uv vs venv and writes to ~/.uv/ or ~/.venv/ accordingly.
     If already registered, updates the custom name if different.
+    If custom name conflicts, appends suffix and warns to stderr.
+    Thread/multiprocess safe using file locking.
 
     Args:
         env_path: Path to the environment directory (e.g., /path/to/.venv)
@@ -150,6 +251,8 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
         - (False, True) if already registered but name was updated
         - (False, False) if already registered with same name
     """
+    import sys
+
     env_path = os.path.abspath(os.path.expanduser(env_path))
 
     if not os.path.isdir(env_path):
@@ -165,50 +268,71 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
     source = "uv" if is_uv_environment(env_path) else "venv"
     registry_path = get_registry_path(source)
 
-    # Check if already registered (check both registries)
-    for check_source, check_registry in [("venv", get_venv_registry_path()),
-                                          ("uv", get_uv_registry_path())]:
-        if not check_registry.exists():
-            continue
-
-        with open(check_registry, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
+    with _registry_lock():
+        # Check if already registered (check both registries)
+        for check_source, check_registry in [("venv", get_venv_registry_path()),
+                                              ("uv", get_uv_registry_path())]:
+            if not check_registry.exists():
                 continue
 
-            parts = stripped.split('\t', 1)
-            existing_path = os.path.abspath(os.path.expanduser(parts[0]))
-            existing_name = parts[1] if len(parts) > 1 else None
+            with open(check_registry, "r", encoding="utf-8") as f:
+                lines = f.readlines()
 
-            if existing_path == env_path:
-                # Already registered - check if name needs updating
-                # If name is None, preserve existing name (no update)
-                if name is None or existing_name == name:
-                    return (False, False)  # No change needed
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
 
-                # Update the line with new name (name is not None and differs)
-                lines[i] = f"{env_path}\t{name}\n"
+                parts = stripped.split('\t', 1)
+                existing_path = os.path.abspath(os.path.expanduser(parts[0]))
+                existing_name = parts[1] if len(parts) > 1 else None
 
-                with open(check_registry, "w", encoding="utf-8") as f:
-                    f.writelines(lines)
-                return (False, True)  # Updated name
+                if existing_path == env_path:
+                    # Already registered - check if name needs updating
+                    # If name is None, preserve existing name (no update)
+                    if name is None or existing_name == name:
+                        return (False, False)  # No change needed
 
-    # Not registered - add new entry
-    ensure_registry_dir(source)
-    with open(registry_path, "a", encoding="utf-8") as f:
+                    # Check for name conflicts before updating
+                    existing_names = _get_all_custom_names()
+                    # Remove current name from set (we're updating this entry)
+                    if existing_name:
+                        existing_names.discard(existing_name)
+                    unique_name = _make_unique_name(name, existing_names)
+                    if unique_name != name:
+                        print(f"Warning: Name '{name}' already in use, using '{unique_name}'", file=sys.stderr)
+
+                    # Update the line with new name
+                    lines[i] = f"{env_path}\t{unique_name}\n"
+
+                    with open(check_registry, "w", encoding="utf-8") as f:
+                        f.writelines(lines)
+                    return (False, True)  # Updated name
+
+        # Not registered - add new entry
+        # Check for name conflicts if custom name provided
+        final_name = name
         if name:
-            f.write(f"{env_path}\t{name}\n")
-        else:
-            f.write(env_path + "\n")
+            existing_names = _get_all_custom_names()
+            unique_name = _make_unique_name(name, existing_names)
+            if unique_name != name:
+                print(f"Warning: Name '{name}' already in use, using '{unique_name}'", file=sys.stderr)
+            final_name = unique_name
 
-    return (True, False)  # Newly registered
+        ensure_registry_dir(source)
+        with open(registry_path, "a", encoding="utf-8") as f:
+            if final_name:
+                f.write(f"{env_path}\t{final_name}\n")
+            else:
+                f.write(env_path + "\n")
+
+        return (True, False)  # Newly registered
 
 
 def unregister_environment(env_path: str) -> bool:
     """Remove an environment path from both registries.
+
+    Thread/multiprocess safe using file locking.
 
     Args:
         env_path: Path to the environment directory
@@ -219,33 +343,34 @@ def unregister_environment(env_path: str) -> bool:
     env_path = os.path.abspath(os.path.expanduser(env_path))
     removed = False
 
-    # Check both registries
-    for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
-        if not registry_path.exists():
-            continue
+    with _registry_lock():
+        # Check both registries
+        for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
+            if not registry_path.exists():
+                continue
 
-        # Read all lines, filter out the target
-        with open(registry_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+            # Read all lines, filter out the target
+            with open(registry_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
 
-        new_lines = []
-        found = False
-        for line in lines:
-            stripped = line.strip()
-            if stripped and not stripped.startswith("#"):
-                # Parse tab-separated format: path[\tname]
-                parts = stripped.split('\t', 1)
-                path_part = parts[0]
-                normalized = os.path.abspath(os.path.expanduser(path_part))
-                if normalized == env_path:
-                    found = True
-                    continue
-            new_lines.append(line)
+            new_lines = []
+            found = False
+            for line in lines:
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"):
+                    # Parse tab-separated format: path[\tname]
+                    parts = stripped.split('\t', 1)
+                    path_part = parts[0]
+                    normalized = os.path.abspath(os.path.expanduser(path_part))
+                    if normalized == env_path:
+                        found = True
+                        continue
+                new_lines.append(line)
 
-        if found:
-            with open(registry_path, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
-            removed = True
+            if found:
+                with open(registry_path, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+                removed = True
 
     return removed
 

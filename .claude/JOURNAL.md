@@ -162,3 +162,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 53. **Task - Kernel display names use custom names**: Fixed kernel names in JupyterLab to use registry custom names<br>
     **Result**: Added `read_environments_with_names()` function to registry. Updated `_all_envs()` in manager to use custom names when available. Kernel display names in JupyterLab now show custom names instead of path-derived names. Added test for kernel display name with custom name
+
+54. **Task - Registry sanitization and thread safety**: Made registry operations thread/multiprocess safe and auto-fix duplicates<br>
+    **Result**: Registry `read_environments_with_names()` now detects and fixes duplicate custom names in-place with `_1`, `_2` suffixes. Added `filelock` dependency for cross-platform file locking. Applied `_registry_lock()` to `register_environment()`, `unregister_environment()`, and `read_environments_with_names()`. Changed scan command to use `--path` flag (defaults to workspace root). Updated CLI list to use manager's conflict-resolved names. Updated NB_VENV_KERNELS_MECHANICS.md and CHANGELOG.md

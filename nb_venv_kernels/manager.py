@@ -204,10 +204,14 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 else:
                     env_name = env_dir
 
-            # Handle duplicates by appending counter
+            # Handle duplicates by appending _1, _2, etc.
             if env_name in seen_names:
-                seen_names[env_name] += 1
-                env_name = f"{env_name}_{seen_names[env_name]}"
+                suffix = seen_names[env_name]
+                while f"{env_name}_{suffix}" in seen_names:
+                    suffix += 1
+                seen_names[f"{env_name}_{suffix}"] = 1
+                seen_names[env_name] = suffix + 1
+                env_name = f"{env_name}_{suffix}"
             else:
                 seen_names[env_name] = 1
 

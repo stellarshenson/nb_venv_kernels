@@ -1,6 +1,6 @@
 # nb_venv_kernels - Environment Discovery Mechanism
 
-@nb_venv_kernels version: 1.2.2<br>
+@nb_venv_kernels version: 1.2.6<br>
 @created on: 2025-11-27
 
 This document describes how nb_venv_kernels discovers and presents venv/uv environments as Jupyter kernels.
@@ -275,12 +275,24 @@ This ordering groups new environments first, then updated, then existing, then t
 
 **Name Conflict Resolution:**
 
-When multiple environments have the same derived name, subsequent entries receive `_1`, `_2`, `_3` suffixes to ensure uniqueness. For example, if two projects both have `.venv` directories and derive the name "myproject", they display as:
+Duplicate names are handled at the registry level - the single source of truth:
+
+1. **At registration time** - When registering with `-n NAME`, if the name already exists, a warning is printed to stderr and the name is automatically suffixed with `_1`, `_2`, etc. The unique name is stored in the registry
+
+2. **At read time** - When reading the registry, if duplicate custom names are detected (from manual edits or older versions), they are automatically fixed in-place with `_1`, `_2` suffixes
+
+3. **Derived names** - For environments without custom names, the kernel spec manager applies suffix rules to ensure unique kernel names when multiple environments derive the same name from their paths
+
+For example, if two projects both have `.venv` directories and derive the name "myproject":
 
 - `myproject` (first encountered)
 - `myproject_1` (second encountered)
 
 Name changes from conflict resolution are marked as "update" action in scan output since the display name differs from the stored name.
+
+**Thread/Multiprocess Safety:**
+
+All registry operations use file locking via the `filelock` package (cross-platform - Linux, macOS, Windows). A single global lock at `~/.venv/registry.lock` serializes access to both venv and uv registries, preventing race conditions when multiple processes or threads access the registry simultaneously.
 
 ## Caching Strategy
 
