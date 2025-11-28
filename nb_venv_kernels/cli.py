@@ -21,6 +21,7 @@ class Colors:
     """ANSI color codes for terminal output."""
     GREEN = "\033[32m"
     BLUE = "\033[94m"
+    CYAN = "\033[36m"
     ORANGE = "\033[33m"  # Darker orange/yellow
     RED = "\033[31m"
     RESET = "\033[0m"
@@ -48,6 +49,10 @@ class Colors:
     @classmethod
     def orange(cls, text: str) -> str:
         return f"{cls.ORANGE}{text}{cls.RESET}" if cls.enabled() else text
+
+    @classmethod
+    def cyan(cls, text: str) -> str:
+        return f"{cls.CYAN}{text}{cls.RESET}" if cls.enabled() else text
 
 
 class Spinner:
@@ -501,6 +506,8 @@ def main():
                 sys.exit(1)
             elif result["registered"]:
                 print(f"Registered: {result['path']}")
+            elif result.get("updated"):
+                print(f"Updated: {result['path']}")
             else:
                 print(f"Already registered: {result['path']}")
             print()
@@ -615,7 +622,7 @@ def main():
             sys.exit(1)
 
         # Sort environments by action order, then by type order, then by name
-        action_order = {"add": 0, "keep": 1, "remove": 2}
+        action_order = {"add": 0, "update": 1, "keep": 2, "remove": 3}
         type_order = {"conda": 0, "uv": 1, "venv": 2}
 
         def sort_key(env):
@@ -630,6 +637,8 @@ def main():
         def colorize_action(action):
             if action == "add":
                 return Colors.green(action)
+            elif action == "update":
+                return Colors.cyan(action)
             elif action == "keep":
                 return Colors.blue(action)
             elif action == "remove":
@@ -638,6 +647,7 @@ def main():
 
         # Summary counts
         total_add = result["summary"]["add"]
+        total_update = result["summary"].get("update", 0)
         total_keep = result["summary"]["keep"]
         total_remove = result["summary"]["remove"]
 
@@ -670,7 +680,7 @@ def main():
                     print(f"{action_colored} {env['name']:<30} {env['type']:<16} {exists_str:<8} {kernel_str:<8} {display_path}")
                 print()
 
-            if total_add == 0 and total_keep == 0 and total_remove == 0:
+            if total_add == 0 and total_update == 0 and total_keep == 0 and total_remove == 0:
                 print("No environments found.")
             else:
                 parts = []
@@ -678,6 +688,8 @@ def main():
                 if dry_run:
                     if total_add > 0:
                         parts.append(f"{total_add} add")
+                    if total_update > 0:
+                        parts.append(f"{total_update} update")
                     if total_keep > 0:
                         parts.append(f"{total_keep} keep")
                     if total_remove > 0:
@@ -686,6 +698,8 @@ def main():
                 else:
                     if total_add > 0:
                         parts.append(f"{total_add} added")
+                    if total_update > 0:
+                        parts.append(f"{total_update} updated")
                     if total_keep > 0:
                         parts.append(f"{total_keep} kept")
                     if total_remove > 0:

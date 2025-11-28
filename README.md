@@ -89,9 +89,10 @@ The scan command automatically:
 nb_venv_kernels register /path/to/.venv
 nb_venv_kernels register /path/to/.venv -n "My Project"  # With custom display name
 nb_venv_kernels unregister /path/to/.venv
+nb_venv_kernels unregister -n "My Project"               # Unregister by name
 ```
 
-Custom names are stored in the registry and used in kernel display names (venv/uv only, ignored for conda).
+Custom names are stored in the registry and used in kernel display names (venv/uv only, ignored for conda). Re-registering an existing environment with a different name updates it.
 
 ### Listing Environments
 

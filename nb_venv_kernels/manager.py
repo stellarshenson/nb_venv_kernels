@@ -526,7 +526,11 @@ class VEnvKernelSpecManager(KernelSpecManager):
         path = abspath(path)
         result = scan_directory(path, max_depth=max_depth, dry_run=dry_run)
 
-        def get_env_info(env_path, env_type, action, exists=None):
+        # Build lookup of custom names from registry
+        registry_envs = _list_environments()
+        custom_names = {env["path"]: env.get("custom_name") for env in registry_envs}
+
+        def get_env_info(env_path, env_type, action, exists=None, custom_name=None):
             """Build environment info dict with exists and has_kernel."""
             # Trust exists parameter if provided (environment was just found)
             if exists is None:
@@ -535,7 +539,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
             has_kernel = _check_has_kernel(kernel_path) if exists else False
             return {
                 "action": action,
-                "name": self._get_env_display_name(env_path, env_type),
+                "name": self._get_env_display_name(env_path, env_type, custom_name),
                 "type": env_type,
                 "exists": exists,
                 "has_kernel": has_kernel,
@@ -545,6 +549,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
         # Build environment list with actions
         environments = []
         seen_paths = set()
+        update_count = 0
 
         # Environments found during scan - they exist (we just found them)
         for env_path in result["registered"]:
@@ -554,7 +559,15 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
         for env_path in result["skipped"]:
             env_type = "uv" if is_uv_environment(env_path) else "venv"
-            environments.append(get_env_info(env_path, env_type, "keep", exists=True))
+            custom_name = custom_names.get(env_path)
+            # Check if custom name differs from auto-derived name (indicates update)
+            auto_name = self._get_env_display_name(env_path, env_type, None)
+            if custom_name and custom_name != auto_name:
+                action = "update"
+                update_count += 1
+            else:
+                action = "keep"
+            environments.append(get_env_info(env_path, env_type, action, exists=True, custom_name=custom_name))
             seen_paths.add(env_path)
 
         for env_path in result["conda_found"]:
@@ -584,11 +597,15 @@ class VEnvKernelSpecManager(KernelSpecManager):
             self._venv_kernels_cache = None
             self._venv_kernels_cache_expiry = None
 
+        # Calculate keep count (excludes update count)
+        keep_count = len(result["skipped"]) + len(result["conda_found"]) + global_conda_count - update_count
+
         return {
             "environments": environments,
             "summary": {
                 "add": len(result["registered"]),
-                "keep": len(result["skipped"]) + len(result["conda_found"]) + global_conda_count,
+                "keep": keep_count,
+                "update": update_count,
                 "remove": len(result["not_available"]),
             },
             "dry_run": dry_run,
@@ -602,17 +619,17 @@ class VEnvKernelSpecManager(KernelSpecManager):
             name: Optional custom display name (ignored for conda environments)
 
         Returns:
-            Dict with keys: path, registered (bool), name (str or None), error (str or None)
+            Dict with keys: path, registered (bool), updated (bool), name (str or None), error (str or None)
         """
         path = abspath(path)
         try:
-            registered = register_environment(path, name=name)
+            registered, updated = register_environment(path, name=name)
             # Invalidate cache
             self._venv_kernels_cache = None
             self._venv_kernels_cache_expiry = None
-            return {"path": path, "registered": registered, "name": name, "error": None}
+            return {"path": path, "registered": registered, "updated": updated, "name": name, "error": None}
         except ValueError as e:
-            return {"path": path, "registered": False, "name": name, "error": str(e)}
+            return {"path": path, "registered": False, "updated": False, "name": name, "error": str(e)}
 
     def unregister_environment(self, path):
         """Remove an environment from kernel discovery.

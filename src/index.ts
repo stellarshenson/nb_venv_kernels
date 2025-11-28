@@ -28,6 +28,7 @@ interface IScanResult {
   environments: IScanEnvironment[];
   summary: {
     add: number;
+    update: number;
     keep: number;
     remove: number;
   };
@@ -64,7 +65,12 @@ async function scanEnvironments(): Promise<IScanResult> {
 function sortEnvironments(
   environments: IScanEnvironment[]
 ): IScanEnvironment[] {
-  const actionOrder: Record<string, number> = { add: 0, keep: 1, remove: 2 };
+  const actionOrder: Record<string, number> = {
+    add: 0,
+    update: 1,
+    keep: 2,
+    remove: 3
+  };
   const typeOrder: Record<string, number> = { conda: 0, uv: 1, venv: 2 };
 
   return [...environments].sort((a, b) => {
@@ -93,6 +99,7 @@ function buildResultsContent(result: IScanResult): string {
   // Build intro message
   const total = result.environments.length;
   const added = result.summary.add;
+  const updated = result.summary.update || 0;
   const kept = result.summary.keep;
   const removed = result.summary.remove;
 
@@ -103,6 +110,9 @@ function buildResultsContent(result: IScanResult): string {
     const parts = [];
     if (added > 0) {
       parts.push(`${added} new`);
+    }
+    if (updated > 0) {
+      parts.push(`${updated} updated`);
     }
     if (kept > 0) {
       parts.push(`${kept} kept`);
@@ -146,6 +156,9 @@ function buildResultsContent(result: IScanResult): string {
   if (result.summary.add > 0) {
     summaryParts.push(`${result.summary.add} added`);
   }
+  if (updated > 0) {
+    summaryParts.push(`${updated} updated`);
+  }
   if (result.summary.keep > 0) {
     summaryParts.push(`${result.summary.keep} kept`);
   }
@@ -169,6 +182,7 @@ function buildResultsContent(result: IScanResult): string {
       .nb-venv-table tbody tr { line-height: 1.2; }
       .nb-venv-table .path-col { font-family: var(--jp-code-font-family); font-size: var(--jp-code-font-size); white-space: normal; }
       .nb-venv-action-add { color: #22c55e; font-weight: 500; }
+      .nb-venv-action-update { color: #06b6d4; font-weight: 500; }
       .nb-venv-action-keep { color: #3b82f6; }
       .nb-venv-action-remove { color: #f97316; }
       .nb-venv-no { color: #ef4444; }

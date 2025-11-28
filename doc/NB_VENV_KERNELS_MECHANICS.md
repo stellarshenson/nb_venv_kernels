@@ -1,6 +1,6 @@
 # nb_venv_kernels - Environment Discovery Mechanism
 
-@nb_venv_kernels version: 1.1.45<br>
+@nb_venv_kernels version: 1.1.48<br>
 @created on: 2025-11-27
 
 This document describes how nb_venv_kernels discovers and presents venv/uv environments as Jupyter kernels.
@@ -56,10 +56,13 @@ Registration methods:
 ```bash
 # CLI registration
 nb_venv_kernels register /path/to/.venv
+nb_venv_kernels register /path/to/.venv -n "My Project"  # With custom name
 
 # Directory scanning
 nb_venv_kernels scan /path/to/projects
 ```
+
+Re-registering an existing environment with a different name updates the custom name in the registry.
 
 Auto-detection of uv environments via `pyvenv.cfg`:
 
@@ -255,13 +258,19 @@ Within each priority, kernels sort alphabetically by name.
 
 The `scan` command output (CLI and JupyterLab modal) sorts environments by three criteria:
 
-| Priority | Field  | Order                           |
-| -------- | ------ | ------------------------------- |
-| 1        | Action | add (0), keep (1), remove (2)   |
-| 2        | Type   | conda (0), uv (1), venv (2)     |
-| 3        | Name   | Alphabetical (case-insensitive) |
+| Priority | Field  | Order                                       |
+| -------- | ------ | ------------------------------------------- |
+| 1        | Action | add (0), update (1), keep (2), remove (3)   |
+| 2        | Type   | conda (0), uv (1), venv (2)                 |
+| 3        | Name   | Alphabetical (case-insensitive)             |
 
-This ordering groups new environments first, then existing, then those scheduled for removal - with consistent type ordering within each action group.
+This ordering groups new environments first, then those with custom names (update), then existing, then those scheduled for removal - with consistent type ordering within each action group.
+
+**Action meanings:**
+- **add** (green) - new environment being registered
+- **update** (cyan) - existing environment with custom name that differs from auto-derived name
+- **keep** (blue) - existing environment unchanged
+- **remove** (orange) - environment no longer exists, being unregistered
 
 ## Caching Strategy
 

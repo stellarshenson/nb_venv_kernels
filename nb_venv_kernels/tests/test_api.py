@@ -139,6 +139,7 @@ class TestRegisterEnvironmentAPI:
         assert isinstance(result, dict)
         assert result["path"] == venv_path
         assert result["registered"] is True
+        assert result["updated"] is False
         assert result["error"] is None
 
         # Cleanup
@@ -149,6 +150,7 @@ class TestRegisterEnvironmentAPI:
         result = manager.register_environment("/nonexistent/path")
 
         assert result["registered"] is False
+        assert result["updated"] is False
         assert result["error"] is not None
 
     def test_register_environment_double_registration(self, temp_dir, manager):
@@ -158,9 +160,49 @@ class TestRegisterEnvironmentAPI:
 
         result1 = manager.register_environment(venv_path)
         assert result1["registered"] is True
+        assert result1["updated"] is False
 
         result2 = manager.register_environment(venv_path)
         assert result2["registered"] is False
+        assert result2["updated"] is False
+
+        # Cleanup
+        manager.unregister_environment(venv_path)
+
+    def test_register_environment_with_name(self, temp_dir, manager):
+        """Test registering an environment with a custom name."""
+        venv_path = os.path.join(temp_dir, "api-named-reg")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+
+        result = manager.register_environment(venv_path, name="my-api-env")
+
+        assert result["registered"] is True
+        assert result["updated"] is False
+        assert result["name"] == "my-api-env"
+
+        # Cleanup
+        manager.unregister_environment(venv_path)
+
+    def test_register_environment_update_name(self, temp_dir, manager):
+        """Test updating the custom name of an already registered environment."""
+        venv_path = os.path.join(temp_dir, "api-update-name")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+
+        # First registration without name
+        result1 = manager.register_environment(venv_path)
+        assert result1["registered"] is True
+        assert result1["updated"] is False
+
+        # Update with a custom name
+        result2 = manager.register_environment(venv_path, name="new-name")
+        assert result2["registered"] is False
+        assert result2["updated"] is True
+        assert result2["name"] == "new-name"
+
+        # Same name should not update
+        result3 = manager.register_environment(venv_path, name="new-name")
+        assert result3["registered"] is False
+        assert result3["updated"] is False
 
         # Cleanup
         manager.unregister_environment(venv_path)

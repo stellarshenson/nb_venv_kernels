@@ -35,8 +35,9 @@ class TestEnvironmentRegistration:
         venv_path = os.path.join(temp_dir, "reg-test-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
 
-        result = register_environment(venv_path)
-        assert result is True
+        registered, updated = register_environment(venv_path)
+        assert registered is True
+        assert updated is False
 
         # Should be in registry
         envs = read_environments()
@@ -77,12 +78,84 @@ class TestEnvironmentRegistration:
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
 
         # First registration
-        result1 = register_environment(venv_path)
-        assert result1 is True
+        registered1, updated1 = register_environment(venv_path)
+        assert registered1 is True
+        assert updated1 is False
 
-        # Second registration should return False (already registered)
-        result2 = register_environment(venv_path)
-        assert result2 is False
+        # Second registration should return (False, False) - already registered, no change
+        registered2, updated2 = register_environment(venv_path)
+        assert registered2 is False
+        assert updated2 is False
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_register_with_custom_name(self, temp_dir):
+        """Test registering an environment with a custom name."""
+        venv_path = os.path.join(temp_dir, "named-venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+
+        # Register with custom name
+        registered, updated = register_environment(venv_path, name="my-custom-name")
+        assert registered is True
+        assert updated is False
+
+        # Verify custom name is stored
+        from ..registry import list_environments
+        envs = list_environments()
+        env = next((e for e in envs if e["path"] == venv_path), None)
+        assert env is not None
+        assert env["custom_name"] == "my-custom-name"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_update_custom_name(self, temp_dir):
+        """Test updating the custom name of an already registered environment."""
+        venv_path = os.path.join(temp_dir, "update-name-venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+
+        # First registration without name
+        registered1, updated1 = register_environment(venv_path)
+        assert registered1 is True
+        assert updated1 is False
+
+        # Register again with custom name - should update
+        registered2, updated2 = register_environment(venv_path, name="new-name")
+        assert registered2 is False  # Not newly registered
+        assert updated2 is True  # But name was updated
+
+        # Verify custom name is stored
+        from ..registry import list_environments
+        envs = list_environments()
+        env = next((e for e in envs if e["path"] == venv_path), None)
+        assert env is not None
+        assert env["custom_name"] == "new-name"
+
+        # Update to a different name
+        registered3, updated3 = register_environment(venv_path, name="another-name")
+        assert registered3 is False
+        assert updated3 is True
+
+        # Verify new name
+        envs = list_environments()
+        env = next((e for e in envs if e["path"] == venv_path), None)
+        assert env["custom_name"] == "another-name"
+
+        # Register with same name - should not update
+        registered4, updated4 = register_environment(venv_path, name="another-name")
+        assert registered4 is False
+        assert updated4 is False  # No change
+
+        # Remove custom name by passing None
+        registered5, updated5 = register_environment(venv_path, name=None)
+        assert registered5 is False
+        assert updated5 is True  # Name was removed
+
+        # Verify name is gone
+        envs = list_environments()
+        env = next((e for e in envs if e["path"] == venv_path), None)
+        assert env["custom_name"] is None
 
         # Cleanup
         unregister_environment(venv_path)

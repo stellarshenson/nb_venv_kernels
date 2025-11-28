@@ -114,17 +114,21 @@ def read_environments() -> List[str]:
     return environments
 
 
-def register_environment(env_path: str, name: Optional[str] = None) -> bool:
+def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[bool, bool]:
     """Register an environment path in the appropriate registry.
 
     Auto-detects uv vs venv and writes to ~/.uv/ or ~/.venv/ accordingly.
+    If already registered, updates the custom name if different.
 
     Args:
         env_path: Path to the environment directory (e.g., /path/to/.venv)
         name: Optional custom display name for the environment
 
     Returns:
-        True if newly registered, False if already registered.
+        Tuple of (registered, updated):
+        - (True, False) if newly registered
+        - (False, True) if already registered but name was updated
+        - (False, False) if already registered with same name
     """
     env_path = os.path.abspath(os.path.expanduser(env_path))
 
@@ -137,24 +141,52 @@ def register_environment(env_path: str, name: Optional[str] = None) -> bool:
     if not os.path.exists(python_path) and not os.path.exists(python_path_win):
         raise ValueError(f"Not a valid Python environment: {env_path}")
 
-    # Check if already registered in either registry
-    existing = read_environments()
-    if env_path in existing:
-        return False
-
     # Detect source and use appropriate registry
     source = "uv" if is_uv_environment(env_path) else "venv"
-    ensure_registry_dir(source)
-
-    # Append to registry with optional name (tab-separated)
     registry_path = get_registry_path(source)
+
+    # Check if already registered (check both registries)
+    for check_source, check_registry in [("venv", get_venv_registry_path()),
+                                          ("uv", get_uv_registry_path())]:
+        if not check_registry.exists():
+            continue
+
+        with open(check_registry, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+
+            parts = stripped.split('\t', 1)
+            existing_path = os.path.abspath(os.path.expanduser(parts[0]))
+            existing_name = parts[1] if len(parts) > 1 else None
+
+            if existing_path == env_path:
+                # Already registered - check if name needs updating
+                if existing_name == name:
+                    return (False, False)  # Same name, no change
+
+                # Update the line with new name
+                if name:
+                    lines[i] = f"{env_path}\t{name}\n"
+                else:
+                    lines[i] = f"{env_path}\n"
+
+                with open(check_registry, "w", encoding="utf-8") as f:
+                    f.writelines(lines)
+                return (False, True)  # Updated name
+
+    # Not registered - add new entry
+    ensure_registry_dir(source)
     with open(registry_path, "a", encoding="utf-8") as f:
         if name:
             f.write(f"{env_path}\t{name}\n")
         else:
             f.write(env_path + "\n")
 
-    return True
+    return (True, False)  # Newly registered
 
 
 def unregister_environment(env_path: str) -> bool:
@@ -510,7 +542,8 @@ def scan_directory(root_path: str, max_depth: int = 7,
                     else:
                         # Try to register
                         try:
-                            if register_environment(full_path):
+                            was_registered, was_updated = register_environment(full_path)
+                            if was_registered:
                                 registered.append(full_path)
                             else:
                                 skipped.append(full_path)

@@ -150,3 +150,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 49. **Task - Publish v1.1.47**: Published package to PyPI and npm<br>
     **Result**: Version bumped to 1.1.47, published to both registries via `make publish`
+
+50. **Task - Scan update action and name preservation**: Added update action for custom names and register name update<br>
+    **Result**: Scan now preserves custom names from registry for existing environments. Added "update" action (cyan) when custom name differs from auto-derived name. Modified register_environment() to return (registered, updated) tuple - can now update name for existing path. Updated CLI, modal, and API to handle update action. Added tests for custom name registration and update behavior
