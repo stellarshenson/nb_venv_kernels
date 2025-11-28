@@ -2,6 +2,15 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.4
+
+### Kernel Display Names
+
+- Kernel display names in JupyterLab now use custom names from registry
+- Previously kernels showed path-derived names even when custom name was registered
+- Added `read_environments_with_names()` function to registry API
+- Added test for kernel display names with custom names
+
 ## 1.2.2
 
 ### Name Conflict Resolution

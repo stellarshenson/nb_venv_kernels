@@ -24,6 +24,7 @@ except ImportError:
 
 from .registry import (
     read_environments,
+    read_environments_with_names,
     is_uv_environment,
     list_environments as _list_environments,
     scan_directory,
@@ -187,23 +188,26 @@ class VEnvKernelSpecManager(KernelSpecManager):
         all_envs = {}
         seen_names = {}
 
-        for env_path in read_environments():
+        for env_path, custom_name in read_environments_with_names():
             # Apply filter if configured
             if self.env_filter and self._env_filter_regex.search(env_path):
                 continue
 
-            # Derive environment name from path
-            # Use parent directory name if .venv, otherwise use directory name
-            env_dir = basename(env_path)
-            if env_dir == ".venv":
-                env_name = basename(dirname(env_path))
+            # Use custom name if available, otherwise derive from path
+            if custom_name:
+                env_name = custom_name
             else:
-                env_name = env_dir
+                # Use parent directory name if .venv, otherwise use directory name
+                env_dir = basename(env_path)
+                if env_dir == ".venv":
+                    env_name = basename(dirname(env_path))
+                else:
+                    env_name = env_dir
 
             # Handle duplicates by appending counter
             if env_name in seen_names:
                 seen_names[env_name] += 1
-                env_name = f"{env_name}-{seen_names[env_name]}"
+                env_name = f"{env_name}_{seen_names[env_name]}"
             else:
                 seen_names[env_name] = 1
 

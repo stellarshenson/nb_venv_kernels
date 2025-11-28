@@ -114,6 +114,26 @@ def read_environments() -> List[str]:
     return environments
 
 
+def read_environments_with_names() -> List[Tuple[str, Optional[str]]]:
+    """Read all registered environments with their custom names.
+
+    Returns:
+        List of (path, custom_name) tuples. custom_name is None if not set.
+        Combines ~/.venv/environments.txt and ~/.uv/environments.txt.
+    """
+    environments = []
+    seen = set()
+
+    # Read from both registries
+    for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
+        for env_path, custom_name in _read_registry_file(registry_path, include_names=True):
+            if env_path not in seen:
+                environments.append((env_path, custom_name))
+                seen.add(env_path)
+
+    return environments
+
+
 def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[bool, bool]:
     """Register an environment path in the appropriate registry.
 

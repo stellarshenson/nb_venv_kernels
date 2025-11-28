@@ -258,15 +258,16 @@ Within each priority, kernels sort alphabetically by name.
 
 The `scan` command output (CLI and JupyterLab modal) sorts environments by three criteria:
 
-| Priority | Field  | Order                                       |
-| -------- | ------ | ------------------------------------------- |
-| 1        | Action | add (0), update (1), keep (2), remove (3)   |
-| 2        | Type   | conda (0), uv (1), venv (2)                 |
-| 3        | Name   | Alphabetical (case-insensitive)             |
+| Priority | Field  | Order                                     |
+| -------- | ------ | ----------------------------------------- |
+| 1        | Action | add (0), update (1), keep (2), remove (3) |
+| 2        | Type   | conda (0), uv (1), venv (2)               |
+| 3        | Name   | Alphabetical (case-insensitive)           |
 
 This ordering groups new environments first, then updated, then existing, then those scheduled for removal - with consistent type ordering within each action group.
 
 **Action meanings:**
+
 - **add** (green) - new environment being registered
 - **update** (cyan) - environment where an actual change was made (name updated in registry or name changed due to duplicate resolution)
 - **keep** (blue) - existing environment unchanged
@@ -275,6 +276,7 @@ This ordering groups new environments first, then updated, then existing, then t
 **Name Conflict Resolution:**
 
 When multiple environments have the same derived name, subsequent entries receive `_1`, `_2`, `_3` suffixes to ensure uniqueness. For example, if two projects both have `.venv` directories and derive the name "myproject", they display as:
+
 - `myproject` (first encountered)
 - `myproject_1` (second encountered)
 

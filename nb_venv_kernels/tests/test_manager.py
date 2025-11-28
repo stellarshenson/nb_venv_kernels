@@ -372,6 +372,34 @@ class TestKernelSpecDetails:
         # Cleanup
         unregister_environment(venv_path)
 
+    def test_kernel_display_name_with_custom_name(self, temp_dir, manager):
+        """Test kernel display name uses custom name from registry."""
+        venv_path = os.path.join(temp_dir, "custom-name-kernel-test")
+        custom_name = "my-custom-kernel"
+
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        pip_path = os.path.join(venv_path, "bin", "pip")
+        subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
+
+        # Register with custom name
+        register_environment(venv_path, name=custom_name)
+
+        # Invalidate cache to pick up new registration
+        invalidate_cache(manager)
+
+        specs = manager.find_kernel_specs()
+        # Kernel name should contain custom name, not directory name
+        matching = [k for k in specs.keys() if custom_name in k.lower()]
+        assert len(matching) > 0, f"Kernel with custom name not found. Available: {list(specs.keys())}"
+
+        spec = manager.get_kernel_spec(matching[0])
+
+        # Display name should contain custom name
+        assert custom_name in spec.display_name.lower(), f"Custom name '{custom_name}' not in display: {spec.display_name}"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
 
 class TestNameConflictResolution:
     """Tests for name conflict resolution with suffixes."""

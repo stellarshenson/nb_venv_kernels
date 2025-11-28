@@ -159,3 +159,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 52. **Task - v1.2.x name conflict resolution and bug fixes**: Major release with name handling improvements<br>
     **Result**: Added name conflict resolution with `_1`, `_2`, `_3` suffixes for duplicate environment names. Fixed "update" action to only show when actual change made (not just for custom names). Fixed `unregister_environment` bug that failed to remove entries with tab-separated custom names. Added comprehensive tests for name conflict resolution and unregister with custom names. Updated CHANGELOG, README, and NB_VENV_KERNELS_MECHANICS.md
+
+53. **Task - Kernel display names use custom names**: Fixed kernel names in JupyterLab to use registry custom names<br>
+    **Result**: Added `read_environments_with_names()` function to registry. Updated `_all_envs()` in manager to use custom names when available. Kernel display names in JupyterLab now show custom names instead of path-derived names. Added test for kernel display name with custom name
