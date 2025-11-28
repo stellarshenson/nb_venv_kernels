@@ -147,15 +147,15 @@ class TestEnvironmentRegistration:
         assert registered4 is False
         assert updated4 is False  # No change
 
-        # Remove custom name by passing None
+        # Passing None preserves existing name (no update)
         registered5, updated5 = register_environment(venv_path, name=None)
         assert registered5 is False
-        assert updated5 is True  # Name was removed
+        assert updated5 is False  # Name preserved, no change
 
-        # Verify name is gone
+        # Verify name is still there
         envs = list_environments()
         env = next((e for e in envs if e["path"] == venv_path), None)
-        assert env["custom_name"] is None
+        assert env["custom_name"] == "another-name"
 
         # Cleanup
         unregister_environment(venv_path)

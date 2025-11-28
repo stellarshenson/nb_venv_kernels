@@ -153,3 +153,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 50. **Task - Scan update action and name preservation**: Added update action for custom names and register name update<br>
     **Result**: Scan now preserves custom names from registry for existing environments. Added "update" action (cyan) when custom name differs from auto-derived name. Modified register_environment() to return (registered, updated) tuple - can now update name for existing path. Updated CLI, modal, and API to handle update action. Added tests for custom name registration and update behavior
+
+51. **Task - Environment validation functions**: Added proper validation and fixed custom name preservation<br>
+    **Result**: Added `is_valid_environment()`, `is_valid_venv_environment()`, `is_valid_uv_environment()`, `is_valid_conda_environment()` functions. Changed list/cleanup/scan to use `is_valid_environment()` instead of `os.path.isdir()` - empty .venv directories now correctly show as invalid. Fixed `register_environment()` to preserve existing custom name when called with `name=None` (scan no longer strips custom names)

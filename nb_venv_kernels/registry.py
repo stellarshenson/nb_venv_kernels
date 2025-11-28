@@ -165,14 +165,12 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
 
             if existing_path == env_path:
                 # Already registered - check if name needs updating
-                if existing_name == name:
-                    return (False, False)  # Same name, no change
+                # If name is None, preserve existing name (no update)
+                if name is None or existing_name == name:
+                    return (False, False)  # No change needed
 
-                # Update the line with new name
-                if name:
-                    lines[i] = f"{env_path}\t{name}\n"
-                else:
-                    lines[i] = f"{env_path}\n"
+                # Update the line with new name (name is not None and differs)
+                lines[i] = f"{env_path}\t{name}\n"
 
                 with open(check_registry, "w", encoding="utf-8") as f:
                     f.writelines(lines)
@@ -289,12 +287,13 @@ def list_environments() -> List[dict]:
         if env_path in seen:
             continue
         seen.add(env_path)
+        env_valid = is_valid_environment(env_path)
         kernel_path = os.path.join(env_path, "share", "jupyter", "kernels")
-        has_kernel = _check_has_kernel(kernel_path)
+        has_kernel = _check_has_kernel(kernel_path) if env_valid else False
         environments.append({
             "path": env_path,
             "type": "venv",
-            "exists": os.path.isdir(env_path),
+            "exists": env_valid,
             "has_kernel": has_kernel,
             "custom_name": custom_name
         })
@@ -306,12 +305,13 @@ def list_environments() -> List[dict]:
         if env_path in seen:
             continue
         seen.add(env_path)
+        env_valid = is_valid_environment(env_path)
         kernel_path = os.path.join(env_path, "share", "jupyter", "kernels")
-        has_kernel = _check_has_kernel(kernel_path)
+        has_kernel = _check_has_kernel(kernel_path) if env_valid else False
         environments.append({
             "path": env_path,
             "type": "uv",
-            "exists": os.path.isdir(env_path),
+            "exists": env_valid,
             "has_kernel": has_kernel,
             "custom_name": custom_name
         })
@@ -375,7 +375,7 @@ def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
             env_path = os.path.abspath(os.path.expanduser(parts[0]))
             custom_name = parts[1] if len(parts) > 1 else None
 
-            if os.path.isdir(env_path):
+            if is_valid_environment(env_path):
                 new_lines.append(line)
             else:
                 removed.append({"path": env_path, "type": source, "custom_name": custom_name})
@@ -388,16 +388,64 @@ def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
     return {"removed": removed}
 
 
-def is_valid_environment(path: str) -> bool:
-    """Check if path is a valid Python virtual environment.
-
-    Returns True if path contains bin/python or Scripts/python.exe.
-    """
-    if not os.path.isdir(path):
-        return False
+def _has_python_executable(path: str) -> bool:
+    """Check if path contains a Python executable (bin/python or Scripts/python.exe)."""
     python_path = os.path.join(path, "bin", "python")
     python_path_win = os.path.join(path, "Scripts", "python.exe")
     return os.path.exists(python_path) or os.path.exists(python_path_win)
+
+
+def is_valid_environment(path: str) -> bool:
+    """Check if path is a valid Python virtual environment (venv or uv).
+
+    Returns True if path is a directory containing bin/python or Scripts/python.exe.
+    """
+    if not os.path.isdir(path):
+        return False
+    return _has_python_executable(path)
+
+
+def is_valid_venv_environment(path: str) -> bool:
+    """Check if path is a valid venv environment.
+
+    A valid venv has:
+    - Directory exists
+    - Contains bin/python or Scripts/python.exe
+    - Is NOT a uv environment (no uv marker in pyvenv.cfg)
+    """
+    if not os.path.isdir(path):
+        return False
+    if not _has_python_executable(path):
+        return False
+    # Must not be uv
+    return not is_uv_environment(path)
+
+
+def is_valid_uv_environment(path: str) -> bool:
+    """Check if path is a valid uv environment.
+
+    A valid uv environment has:
+    - Directory exists
+    - Contains bin/python or Scripts/python.exe
+    - Has uv marker in pyvenv.cfg
+    """
+    if not os.path.isdir(path):
+        return False
+    if not _has_python_executable(path):
+        return False
+    return is_uv_environment(path)
+
+
+def is_valid_conda_environment(path: str) -> bool:
+    """Check if path is a valid conda environment.
+
+    A valid conda environment has:
+    - Directory exists
+    - Contains conda-meta directory
+    """
+    if not os.path.isdir(path):
+        return False
+    return os.path.isdir(os.path.join(path, "conda-meta"))
 
 
 def is_conda_environment(path: str) -> bool:
@@ -473,7 +521,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
                         parts = stripped.split('\t', 1)
                         env_path = os.path.abspath(os.path.expanduser(parts[0]))
                         custom_name = parts[1] if len(parts) > 1 else None
-                        if not os.path.isdir(env_path):
+                        if not is_valid_environment(env_path):
                             not_available.append({"path": env_path, "type": source, "custom_name": custom_name})
     else:
         cleanup_result = cleanup_registries()
