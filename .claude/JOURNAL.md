@@ -165,3 +165,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 54. **Task - Registry sanitization and thread safety**: Made registry operations thread/multiprocess safe and auto-fix duplicates<br>
     **Result**: Registry `read_environments_with_names()` now detects and fixes duplicate custom names in-place with `_1`, `_2` suffixes. Added `filelock` dependency for cross-platform file locking. Applied `_registry_lock()` to `register_environment()`, `unregister_environment()`, and `read_environments_with_names()`. Changed scan command to use `--path` flag (defaults to workspace root). Updated CLI list to use manager's conflict-resolved names. Updated NB_VENV_KERNELS_MECHANICS.md and CHANGELOG.md
+
+55. **Task - Scan shows update for sanitized names**: Scan now displays "update" action when duplicate names are fixed<br>
+    **Result**: Added `sanitize_registry_names()` function that returns list of updated entries. Modified `scan_directory()` to call sanitization and include sanitized paths in "updated" list. Added two tests: `test_scan_shows_update_for_sanitized_names` and `test_sanitize_registry_names_returns_updated`

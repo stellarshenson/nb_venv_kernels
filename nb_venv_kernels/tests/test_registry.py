@@ -11,11 +11,13 @@ from nb_venv_kernels.registry import (
     register_environment,
     unregister_environment,
     read_environments,
+    read_environments_with_names,
     list_environments,
     is_uv_environment,
     get_venv_registry_path,
     get_uv_registry_path,
     scan_directory,
+    sanitize_registry_names,
 )
 
 
@@ -389,3 +391,81 @@ class TestRegistryPaths:
         path = get_uv_registry_path()
         assert ".uv" in str(path)
         assert "environments.txt" in str(path)
+
+
+class TestRegistrySanitization:
+    """Tests for registry name sanitization."""
+
+    def test_scan_shows_update_for_sanitized_names(self, temp_dir):
+        """Test that scan shows 'update' action when duplicate names are sanitized."""
+        # Create two venvs
+        venv1_path = os.path.join(temp_dir, "proj1", ".venv")
+        venv2_path = os.path.join(temp_dir, "proj2", ".venv")
+        os.makedirs(os.path.dirname(venv1_path))
+        os.makedirs(os.path.dirname(venv2_path))
+        subprocess.run(["python", "-m", "venv", venv1_path], check=True, capture_output=True)
+        subprocess.run(["python", "-m", "venv", venv2_path], check=True, capture_output=True)
+
+        # Register both with the same custom name
+        register_environment(venv1_path, name="same-name")
+        # Second one will get "same-name_1" due to conflict resolution at registration
+        register_environment(venv2_path, name="same-name")
+
+        # Now manually write duplicate names to registry to simulate manual edit
+        registry_path = get_venv_registry_path()
+        with open(registry_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        # Replace "same-name_1" with "same-name" to create duplicate
+        content = content.replace("same-name_1", "same-name")
+        with open(registry_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # Run scan - should detect and fix duplicates
+        result = scan_directory(temp_dir, max_depth=3)
+
+        # One of the paths should be in updated list due to name sanitization
+        assert len(result["updated"]) >= 1
+        assert venv1_path in result["updated"] or venv2_path in result["updated"]
+
+        # Verify registry now has unique names
+        envs = read_environments_with_names()
+        names = [name for _, name in envs if name and name.startswith("same-name")]
+        assert len(names) == len(set(names)), "Names should be unique after sanitization"
+
+        # Cleanup
+        unregister_environment(venv1_path)
+        unregister_environment(venv2_path)
+
+    def test_sanitize_registry_names_returns_updated(self, temp_dir):
+        """Test that sanitize_registry_names returns list of updated entries."""
+        # Create two venvs
+        venv1_path = os.path.join(temp_dir, "proj1", ".venv")
+        venv2_path = os.path.join(temp_dir, "proj2", ".venv")
+        os.makedirs(os.path.dirname(venv1_path))
+        os.makedirs(os.path.dirname(venv2_path))
+        subprocess.run(["python", "-m", "venv", venv1_path], check=True, capture_output=True)
+        subprocess.run(["python", "-m", "venv", venv2_path], check=True, capture_output=True)
+
+        # Register both
+        register_environment(venv1_path, name="dup-name")
+        register_environment(venv2_path, name="dup-name")  # Gets "dup-name_1"
+
+        # Manually create duplicate in registry
+        registry_path = get_venv_registry_path()
+        with open(registry_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        content = content.replace("dup-name_1", "dup-name")
+        with open(registry_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # Sanitize should return updated entries
+        updated = sanitize_registry_names()
+
+        assert len(updated) == 1
+        assert updated[0]["old_name"] == "dup-name"
+        assert updated[0]["new_name"] == "dup-name_1"
+        assert updated[0]["path"] in [venv1_path, venv2_path]
+
+        # Cleanup
+        unregister_environment(venv1_path)
+        unregister_environment(venv2_path)

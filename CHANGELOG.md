@@ -2,6 +2,14 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.7
+
+### Scan Shows Update for Sanitized Names
+
+- Scan now shows "update" action when duplicate names are sanitized in registry
+- Added `sanitize_registry_names()` function to registry API
+- Added tests for sanitization update visibility in scan results
+
 ## 1.2.6
 
 ### Registry Sanitization

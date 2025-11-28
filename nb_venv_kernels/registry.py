@@ -148,16 +148,46 @@ def read_environments_with_names() -> List[Tuple[str, Optional[str]]]:
         List of (path, custom_name) tuples. custom_name is None if not set.
         Combines ~/.venv/environments.txt and ~/.uv/environments.txt.
     """
+    environments, _ = _read_and_sanitize_registries()
+    return environments
+
+
+def sanitize_registry_names() -> List[Dict]:
+    """Sanitize duplicate names in registries and return list of updated entries.
+
+    Thread/multiprocess safe using file locking.
+
+    Returns:
+        List of dicts with 'path', 'type', 'old_name', 'new_name' for each updated entry.
+    """
+    _, updated = _read_and_sanitize_registries()
+    return updated
+
+
+def _read_and_sanitize_registries() -> Tuple[List[Tuple[str, Optional[str]]], List[Dict]]:
+    """Read registries and sanitize duplicate names.
+
+    Internal function that does the actual work for both read_environments_with_names()
+    and sanitize_registry_names().
+
+    Returns:
+        Tuple of (environments, updated_entries):
+        - environments: List of (path, custom_name) tuples
+        - updated_entries: List of dicts with path, type, old_name, new_name
+    """
     with _registry_lock():
         environments = []
+        updated_entries = []
         seen_paths = set()
         seen_names = set()
-        updates_needed = {}  # registry_path -> {old_line -> new_line}
+        updates_needed = {}  # registry_path -> {old_line -> (new_line, env_path, old_name, new_name)}
 
         # Read from both registries and detect duplicates
         for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
             if not registry_path.exists():
                 continue
+
+            source = "uv" if registry_path == get_uv_registry_path() else "venv"
 
             with open(registry_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
@@ -180,7 +210,13 @@ def read_environments_with_names() -> List[Tuple[str, Optional[str]]]:
                     # Track update needed
                     if registry_path not in updates_needed:
                         updates_needed[registry_path] = {}
-                    updates_needed[registry_path][stripped] = f"{env_path}\t{unique_name}"
+                    updates_needed[registry_path][stripped] = {
+                        "new_line": f"{env_path}\t{unique_name}",
+                        "path": env_path,
+                        "type": source,
+                        "old_name": custom_name,
+                        "new_name": unique_name,
+                    }
                     custom_name = unique_name
 
                 if custom_name:
@@ -197,14 +233,20 @@ def read_environments_with_names() -> List[Tuple[str, Optional[str]]]:
             for line in lines:
                 stripped = line.strip()
                 if stripped in updates:
-                    new_lines.append(updates[stripped] + "\n")
+                    new_lines.append(updates[stripped]["new_line"] + "\n")
+                    updated_entries.append({
+                        "path": updates[stripped]["path"],
+                        "type": updates[stripped]["type"],
+                        "old_name": updates[stripped]["old_name"],
+                        "new_name": updates[stripped]["new_name"],
+                    })
                 else:
                     new_lines.append(line)
 
             with open(registry_path, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
 
-        return environments
+        return environments, updated_entries
 
 
 def _get_all_custom_names() -> set:
@@ -639,6 +681,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
 
     Searches for venv, uv, and conda environments. Registers found
     environments in appropriate registries and cleans up non-existent ones.
+    Also sanitizes duplicate names in registries.
 
     Args:
         root_path: Directory to start scanning from
@@ -652,6 +695,11 @@ def scan_directory(root_path: str, max_depth: int = 7,
 
     if not os.path.isdir(root_path):
         raise ValueError(f"Directory does not exist: {root_path}")
+
+    # Sanitize duplicate names in registries (updates registry in place)
+    # This happens even in dry_run since it's fixing existing data, not adding new
+    sanitized = sanitize_registry_names()
+    sanitized_paths = {entry["path"] for entry in sanitized}
 
     # Cleanup registries (or just check for not available in dry run)
     not_available = []
@@ -755,6 +803,15 @@ def scan_directory(root_path: str, max_depth: int = 7,
             scan_recursive(full_path, depth + 1)
 
     scan_recursive(root_path, 0)
+
+    # Add sanitized entries to updated list (name was changed due to duplicate)
+    # and remove them from skipped if they were there
+    for entry in sanitized:
+        path = entry["path"]
+        if path not in updated:
+            updated.append(path)
+        if path in skipped:
+            skipped.remove(path)
 
     return {
         "registered": registered,
