@@ -540,7 +540,7 @@ def main():
         # Sort: conda global first, then conda local, uv, venv; by name within each
         def sort_key(e):
             env_type = e.get("type", "venv")
-            name = _get_env_display_name(e["path"], env_type).lower()
+            name = e["name"].lower()  # Use manager's name (has conflict resolution)
             if env_type == "conda":
                 if _is_conda_global(e["path"]):
                     return (0, name)  # conda global first

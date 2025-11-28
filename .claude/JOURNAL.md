@@ -168,3 +168,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 55. **Task - Scan shows update for sanitized names**: Scan now displays "update" action when duplicate names are fixed<br>
     **Result**: Added `sanitize_registry_names()` function that returns list of updated entries. Modified `scan_directory()` to call sanitization and include sanitized paths in "updated" list. Added two tests: `test_scan_shows_update_for_sanitized_names` and `test_sanitize_registry_names_returns_updated`
+
+56. **Task - Consistent sort order**: Fixed inconsistent sorting between list and scan commands<br>
+    **Result**: Changed list command to use `e["name"]` instead of `_get_env_display_name()` for sorting. Both list and scan now use manager's conflict-resolved names for alphabetical sorting within type groups. Published v1.2.8

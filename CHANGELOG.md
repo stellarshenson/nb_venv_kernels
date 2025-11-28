@@ -2,6 +2,13 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.8
+
+### Consistent Sort Order
+
+- Fixed inconsistent sort order between `list` and `scan` commands
+- Both now use manager's conflict-resolved name for sorting
+
 ## 1.2.7
 
 ### Scan Shows Update for Sanitized Names
