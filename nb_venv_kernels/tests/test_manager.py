@@ -371,3 +371,79 @@ class TestKernelSpecDetails:
 
         # Cleanup
         unregister_environment(venv_path)
+
+
+class TestNameConflictResolution:
+    """Tests for name conflict resolution with suffixes."""
+
+    def test_resolve_name_conflicts_no_duplicates(self, manager):
+        """Test that unique names are unchanged."""
+        environments = [
+            {"name": "project-a", "path": "/a"},
+            {"name": "project-b", "path": "/b"},
+            {"name": "project-c", "path": "/c"},
+        ]
+        result = manager._resolve_name_conflicts(environments)
+        assert result[0]["name"] == "project-a"
+        assert result[1]["name"] == "project-b"
+        assert result[2]["name"] == "project-c"
+
+    def test_resolve_name_conflicts_with_duplicates(self, manager):
+        """Test that duplicate names get _1, _2 suffixes."""
+        environments = [
+            {"name": "myproject", "path": "/a"},
+            {"name": "myproject", "path": "/b"},
+            {"name": "myproject", "path": "/c"},
+        ]
+        result = manager._resolve_name_conflicts(environments)
+        assert result[0]["name"] == "myproject"
+        assert result[1]["name"] == "myproject_1"
+        assert result[2]["name"] == "myproject_2"
+
+    def test_resolve_name_conflicts_mixed(self, manager):
+        """Test mixed unique and duplicate names."""
+        environments = [
+            {"name": "unique", "path": "/a"},
+            {"name": "duplicate", "path": "/b"},
+            {"name": "duplicate", "path": "/c"},
+            {"name": "another", "path": "/d"},
+            {"name": "duplicate", "path": "/e"},
+        ]
+        result = manager._resolve_name_conflicts(environments)
+        assert result[0]["name"] == "unique"
+        assert result[1]["name"] == "duplicate"
+        assert result[2]["name"] == "duplicate_1"
+        assert result[3]["name"] == "another"
+        assert result[4]["name"] == "duplicate_2"
+
+    def test_resolve_name_conflicts_updates_action(self, manager):
+        """Test that action is changed to 'update' when name changes."""
+        environments = [
+            {"name": "project", "path": "/a", "action": "keep"},
+            {"name": "project", "path": "/b", "action": "keep"},
+            {"name": "project", "path": "/c", "action": "add"},
+        ]
+        result = manager._resolve_name_conflicts(environments, update_action_on_change=True)
+        # First keeps its name and action
+        assert result[0]["name"] == "project"
+        assert result[0]["action"] == "keep"
+        # Second gets suffix and action changes to update
+        assert result[1]["name"] == "project_1"
+        assert result[1]["action"] == "update"
+        # Third gets suffix but action stays as "add" (not "keep")
+        assert result[2]["name"] == "project_2"
+        assert result[2]["action"] == "add"
+
+    def test_resolve_name_conflicts_preserves_other_fields(self, manager):
+        """Test that other environment fields are preserved."""
+        environments = [
+            {"name": "test", "path": "/a", "type": "venv", "exists": True},
+            {"name": "test", "path": "/b", "type": "uv", "exists": False},
+        ]
+        result = manager._resolve_name_conflicts(environments)
+        assert result[0]["path"] == "/a"
+        assert result[0]["type"] == "venv"
+        assert result[0]["exists"] is True
+        assert result[1]["path"] == "/b"
+        assert result[1]["type"] == "uv"
+        assert result[1]["exists"] is False

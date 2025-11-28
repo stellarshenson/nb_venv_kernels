@@ -2,6 +2,31 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.2
+
+### Name Conflict Resolution
+
+- Duplicate environment names now get `_1`, `_2`, `_3` suffixes automatically
+- Applies to both `list` and `scan` commands
+- Name changes from conflict resolution show as "update" action in scan output
+
+### Update Action Fix
+
+- "update" action now only shows when an actual change was made
+- Previously showed "update" for any environment with custom name
+- Now correctly shows "keep" for unchanged environments with custom names
+
+### Bug Fixes
+
+- Fixed `unregister_environment` failing to remove entries with custom names
+- Registry entries with tab-separated custom names are now properly parsed during unregister
+
+### Testing
+
+- Added comprehensive test suite for name conflict resolution
+- Tests cover: no duplicates, duplicates, mixed, action updates, field preservation
+- Added test for unregistering environments with custom names
+
 ## 1.1.45
 
 ### Custom Environment Names

@@ -111,7 +111,7 @@ my-project                uv               yes      yes      /home/user/my-proje
 another-project           venv             yes      no       /home/user/another-project/venv
 ```
 
-Environments are sorted by type (conda, uv, venv) then by name. The KERNEL column indicates whether `ipykernel` is installed. Missing environments and kernels display "no" in red.
+Environments are sorted by type (conda, uv, venv) then by name. The KERNEL column indicates whether `ipykernel` is installed. Missing environments and kernels display "no" in red. Duplicate names are automatically resolved with `_1`, `_2` suffixes.
 
 ### Jupyter Configuration
 

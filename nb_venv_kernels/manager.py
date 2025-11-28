@@ -456,6 +456,35 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
     # --- API methods for programmatic access ---
 
+    def _resolve_name_conflicts(self, environments, update_action_on_change=False):
+        """Add suffixes to duplicate names to make them unique.
+
+        Args:
+            environments: List of dicts with 'name' key
+            update_action_on_change: If True and env has 'action' key, change action to 'update'
+                                     when name is modified due to conflict
+
+        Returns:
+            Same list with 'name' values made unique via _1, _2, _3 suffixes
+        """
+        seen_names = {}
+        for env in environments:
+            name = env["name"]
+            if name in seen_names:
+                # Find next available suffix
+                suffix = seen_names[name]
+                while f"{name}_{suffix}" in seen_names:
+                    suffix += 1
+                env["name"] = f"{name}_{suffix}"
+                seen_names[f"{name}_{suffix}"] = 1
+                seen_names[name] = suffix + 1
+                # Mark as update if requested and action exists
+                if update_action_on_change and "action" in env and env["action"] == "keep":
+                    env["action"] = "update"
+            else:
+                seen_names[name] = 1
+        return environments
+
     def list_environments(self):
         """List all registered environments with their status.
 
@@ -507,7 +536,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 "custom_name": custom_name,
             })
 
-        return result
+        return self._resolve_name_conflicts(result)
 
     def scan_environments(self, path=".", max_depth=None, dry_run=False):
         """Scan directory for environments and register them.
@@ -549,7 +578,6 @@ class VEnvKernelSpecManager(KernelSpecManager):
         # Build environment list with actions
         environments = []
         seen_paths = set()
-        update_count = 0
 
         # Environments found during scan - they exist (we just found them)
         for env_path in result["registered"]:
@@ -557,17 +585,18 @@ class VEnvKernelSpecManager(KernelSpecManager):
             environments.append(get_env_info(env_path, env_type, "add", exists=True))
             seen_paths.add(env_path)
 
+        # Environments that were actually updated (name changed)
+        for env_path in result.get("updated", []):
+            env_type = "uv" if is_uv_environment(env_path) else "venv"
+            custom_name = custom_names.get(env_path)
+            environments.append(get_env_info(env_path, env_type, "update", exists=True, custom_name=custom_name))
+            seen_paths.add(env_path)
+
+        # Environments already registered (no change)
         for env_path in result["skipped"]:
             env_type = "uv" if is_uv_environment(env_path) else "venv"
             custom_name = custom_names.get(env_path)
-            # Check if custom name differs from auto-derived name (indicates update)
-            auto_name = self._get_env_display_name(env_path, env_type, None)
-            if custom_name and custom_name != auto_name:
-                action = "update"
-                update_count += 1
-            else:
-                action = "keep"
-            environments.append(get_env_info(env_path, env_type, action, exists=True, custom_name=custom_name))
+            environments.append(get_env_info(env_path, env_type, "keep", exists=True, custom_name=custom_name))
             seen_paths.add(env_path)
 
         for env_path in result["conda_found"]:
@@ -597,17 +626,19 @@ class VEnvKernelSpecManager(KernelSpecManager):
             self._venv_kernels_cache = None
             self._venv_kernels_cache_expiry = None
 
-        # Calculate keep count (excludes update count)
-        keep_count = len(result["skipped"]) + len(result["conda_found"]) + global_conda_count - update_count
+        # Resolve name conflicts before returning (mark changed names as "update")
+        environments = self._resolve_name_conflicts(environments, update_action_on_change=True)
+
+        # Calculate counts from actual actions (after name conflict resolution)
+        summary = {"add": 0, "update": 0, "keep": 0, "remove": 0}
+        for env in environments:
+            action = env.get("action", "keep")
+            if action in summary:
+                summary[action] += 1
 
         return {
             "environments": environments,
-            "summary": {
-                "add": len(result["registered"]),
-                "keep": keep_count,
-                "update": update_count,
-                "remove": len(result["not_available"]),
-            },
+            "summary": summary,
             "dry_run": dry_run,
         }
 

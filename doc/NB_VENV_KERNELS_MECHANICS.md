@@ -1,6 +1,6 @@
 # nb_venv_kernels - Environment Discovery Mechanism
 
-@nb_venv_kernels version: 1.1.48<br>
+@nb_venv_kernels version: 1.2.2<br>
 @created on: 2025-11-27
 
 This document describes how nb_venv_kernels discovers and presents venv/uv environments as Jupyter kernels.
@@ -264,13 +264,21 @@ The `scan` command output (CLI and JupyterLab modal) sorts environments by three
 | 2        | Type   | conda (0), uv (1), venv (2)                 |
 | 3        | Name   | Alphabetical (case-insensitive)             |
 
-This ordering groups new environments first, then those with custom names (update), then existing, then those scheduled for removal - with consistent type ordering within each action group.
+This ordering groups new environments first, then updated, then existing, then those scheduled for removal - with consistent type ordering within each action group.
 
 **Action meanings:**
 - **add** (green) - new environment being registered
-- **update** (cyan) - existing environment with custom name that differs from auto-derived name
+- **update** (cyan) - environment where an actual change was made (name updated in registry or name changed due to duplicate resolution)
 - **keep** (blue) - existing environment unchanged
 - **remove** (orange) - environment no longer exists, being unregistered
+
+**Name Conflict Resolution:**
+
+When multiple environments have the same derived name, subsequent entries receive `_1`, `_2`, `_3` suffixes to ensure uniqueness. For example, if two projects both have `.venv` directories and derive the name "myproject", they display as:
+- `myproject` (first encountered)
+- `myproject_1` (second encountered)
+
+Name changes from conflict resolution are marked as "update" action in scan output since the display name differs from the stored name.
 
 ## Caching Strategy
 

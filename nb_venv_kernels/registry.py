@@ -213,7 +213,10 @@ def unregister_environment(env_path: str) -> bool:
         for line in lines:
             stripped = line.strip()
             if stripped and not stripped.startswith("#"):
-                normalized = os.path.abspath(os.path.expanduser(stripped))
+                # Parse tab-separated format: path[\tname]
+                parts = stripped.split('\t', 1)
+                path_part = parts[0]
+                normalized = os.path.abspath(os.path.expanduser(path_part))
                 if normalized == env_path:
                     found = True
                     continue
@@ -498,7 +501,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
         dry_run: If True, only report without making changes
 
     Returns:
-        Dict with 'registered', 'skipped', 'removed', 'conda_found', 'not_available' lists.
+        Dict with 'registered', 'updated', 'skipped', 'conda_found', 'not_available' lists.
     """
     root_path = os.path.abspath(os.path.expanduser(root_path))
 
@@ -528,6 +531,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
         not_available = cleanup_result["removed"]
 
     registered = []
+    updated = []
     skipped = []
     conda_found = []
 
@@ -593,6 +597,8 @@ def scan_directory(root_path: str, max_depth: int = 7,
                             was_registered, was_updated = register_environment(full_path)
                             if was_registered:
                                 registered.append(full_path)
+                            elif was_updated:
+                                updated.append(full_path)
                             else:
                                 skipped.append(full_path)
                         except ValueError:
@@ -607,6 +613,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
 
     return {
         "registered": registered,
+        "updated": updated,
         "skipped": skipped,
         "not_available": not_available,
         "conda_found": conda_found,

@@ -59,6 +59,26 @@ class TestEnvironmentRegistration:
         envs = read_environments()
         assert venv_path not in envs
 
+    def test_unregister_venv_with_custom_name(self, temp_dir):
+        """Test unregistering a venv environment that has a custom name."""
+        venv_path = os.path.join(temp_dir, "unreg-custom-name-venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+
+        # Register with custom name
+        register_environment(venv_path, name="my-custom-name")
+
+        # Verify it's registered
+        envs = read_environments()
+        assert venv_path in envs
+
+        # Unregister by path (should work even with custom name in registry)
+        result = unregister_environment(venv_path)
+        assert result is True
+
+        # Should not be in registry
+        envs = read_environments()
+        assert venv_path not in envs
+
     def test_register_invalid_path(self):
         """Test registering an invalid path."""
         with pytest.raises(ValueError):
