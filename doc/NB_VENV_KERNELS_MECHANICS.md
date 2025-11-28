@@ -1,6 +1,6 @@
 # nb_venv_kernels - Environment Discovery Mechanism
 
-@nb_venv_kernels version: 1.1.43<br>
+@nb_venv_kernels version: 1.1.45<br>
 @created on: 2025-11-27
 
 This document describes how nb_venv_kernels discovers and presents venv/uv environments as Jupyter kernels.
@@ -46,10 +46,10 @@ sequenceDiagram
 
 Environments must be registered before discovery. Unlike nb_conda_kernels which auto-discovers via conda CLI, nb_venv_kernels uses file-based registries:
 
-| Registry | Path | Source |
-|----------|------|--------|
-| venv | `~/.venv/environments.txt` | Standard Python venv |
-| uv | `~/.uv/environments.txt` | uv-created environments |
+| Registry | Path                       | Source                  |
+| -------- | -------------------------- | ----------------------- |
+| venv     | `~/.venv/environments.txt` | Standard Python venv    |
+| uv       | `~/.uv/environments.txt`   | uv-created environments |
 
 Registration methods:
 
@@ -94,13 +94,15 @@ for env_path in read_environments():
     all_envs[env_name] = env_path
 ```
 
-Registry file format (plain text, one path per line):
+Registry file format (plain text with optional tab-separated custom names):
 
 ```
 /home/user/project-a/.venv
-/home/user/project-b/venv
+/home/user/project-b/venv	my-custom-name
 /home/user/experiments/.virtualenv
 ```
+
+Custom names are supported for venv/uv environments via the `-n/--name` option during registration. When provided, the custom name overrides the auto-derived name in the kernel selector.
 
 ## Step 3: Kernelspec Discovery
 
@@ -133,8 +135,10 @@ Original `kernel.json` (installed by ipykernel):
 {
   "argv": [
     "/home/user/project/.venv/bin/python",
-    "-m", "ipykernel_launcher",
-    "-f", "{connection_file}"
+    "-m",
+    "ipykernel_launcher",
+    "-f",
+    "{connection_file}"
   ],
   "display_name": "Python 3 (ipykernel)",
   "language": "python"
@@ -147,8 +151,10 @@ Modified by nb_venv_kernels:
 {
   "argv": [
     "/home/user/project/.venv/bin/python",
-    "-m", "ipykernel_launcher",
-    "-f", "{connection_file}"
+    "-m",
+    "ipykernel_launcher",
+    "-f",
+    "{connection_file}"
   ],
   "display_name": "Python [uv env:project]",
   "language": "python",
@@ -225,23 +231,23 @@ c.ServerApp.kernel_spec_manager_class = "nb_venv_kernels.VEnvKernelSpecManager"
 
 Auto-enabled on install via `jupyter_config.json` data file.
 
-| Method | Purpose |
-|--------|---------|
-| `find_kernel_specs()` | Returns dict of kernel names to resource directories |
-| `get_kernel_spec(name)` | Returns KernelSpec instance for given name |
-| `get_all_specs()` | Returns full metadata for all kernels |
+| Method                  | Purpose                                              |
+| ----------------------- | ---------------------------------------------------- |
+| `find_kernel_specs()`   | Returns dict of kernel names to resource directories |
+| `get_kernel_spec(name)` | Returns KernelSpec instance for given name           |
+| `get_all_specs()`       | Returns full metadata for all kernels                |
 
 ## Kernel Ordering
 
 Kernels are sorted by priority:
 
-| Priority | Source | Description |
-|----------|--------|-------------|
-| 0 | Current | Currently active environment (marked with *) |
-| 1 | Conda | Conda environments |
-| 2 | UV | uv-created environments |
-| 3 | Venv | Standard Python venv |
-| 4 | System | System-installed kernels |
+| Priority | Source  | Description                                   |
+| -------- | ------- | --------------------------------------------- |
+| 0        | Current | Currently active environment (marked with \*) |
+| 1        | Conda   | Conda environments                            |
+| 2        | UV      | uv-created environments                       |
+| 3        | Venv    | Standard Python venv                          |
+| 4        | System  | System-installed kernels                      |
 
 Within each priority, kernels sort alphabetically by name.
 
@@ -249,11 +255,11 @@ Within each priority, kernels sort alphabetically by name.
 
 The `scan` command output (CLI and JupyterLab modal) sorts environments by three criteria:
 
-| Priority | Field | Order |
-|----------|-------|-------|
-| 1 | Action | add (0), keep (1), remove (2) |
-| 2 | Type | conda (0), uv (1), venv (2) |
-| 3 | Name | Alphabetical (case-insensitive) |
+| Priority | Field  | Order                           |
+| -------- | ------ | ------------------------------- |
+| 1        | Action | add (0), keep (1), remove (2)   |
+| 2        | Type   | conda (0), uv (1), venv (2)     |
+| 3        | Name   | Alphabetical (case-insensitive) |
 
 This ordering groups new environments first, then existing, then those scheduled for removal - with consistent type ordering within each action group.
 
@@ -261,8 +267,8 @@ This ordering groups new environments first, then existing, then those scheduled
 
 Single-level caching with 60-second TTL:
 
-| Cache | TTL | Contents |
-|-------|-----|----------|
+| Cache                 | TTL | Contents                     |
+| --------------------- | --- | ---------------------------- |
 | `_venv_kernels_cache` | 60s | Processed KernelSpec objects |
 
 Cache invalidation occurs after:
@@ -292,12 +298,12 @@ This prevents registration of arbitrary system paths while allowing legitimate c
 
 ## Configuration Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `venv_only` | False | Show only venv kernels, hide system and conda kernels |
-| `env_filter` | None | Regex to exclude environments by path |
-| `name_format` | `{language} [{source} env:{environment}]` | Display name template |
-| `scan_depth` | 7 | Default depth for scan command |
+| Option        | Default                                   | Description                                           |
+| ------------- | ----------------------------------------- | ----------------------------------------------------- |
+| `venv_only`   | False                                     | Show only venv kernels, hide system and conda kernels |
+| `env_filter`  | None                                      | Regex to exclude environments by path                 |
+| `name_format` | `{language} [{source} env:{environment}]` | Display name template                                 |
+| `scan_depth`  | 7                                         | Default depth for scan command                        |
 
 ## Why Standard Jupyter Doesn't See These Kernels
 

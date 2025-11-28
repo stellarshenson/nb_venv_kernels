@@ -16,6 +16,7 @@ All endpoints require authentication via Jupyter server token.
 Returns list of all registered environments with their status.
 
 **Response:**
+
 ```json
 [
   {
@@ -36,6 +37,7 @@ Returns list of all registered environments with their status.
 ```
 
 **Fields:**
+
 - `name` - Display name derived from environment path
 - `type` - Environment type: `venv`, `uv`, `conda`, or `conda (local)`
 - `exists` - Whether environment directory exists
@@ -49,6 +51,7 @@ Returns list of all registered environments with their status.
 Scan directory for environments and register them.
 
 **Request Body:**
+
 ```json
 {
   "path": "/home/user/workspace",
@@ -58,11 +61,13 @@ Scan directory for environments and register them.
 ```
 
 **Parameters:**
+
 - `path` - Directory to scan (default: server working directory)
 - `depth` - Maximum recursion depth (default: from server config, usually 7)
 - `dry_run` - If true, report without making changes (default: false)
 
 **Response:**
+
 ```json
 {
   "environments": [
@@ -95,6 +100,7 @@ Scan directory for environments and register them.
 ```
 
 **Actions:**
+
 - `add` - Environment newly discovered and registered
 - `keep` - Environment already registered
 - `remove` - Environment removed (no longer exists)
@@ -106,6 +112,7 @@ Scan directory for environments and register them.
 Register a single environment for kernel discovery.
 
 **Request Body:**
+
 ```json
 {
   "path": "/home/user/my-project/.venv"
@@ -113,6 +120,7 @@ Register a single environment for kernel discovery.
 ```
 
 **Response:**
+
 ```json
 {
   "path": "/home/user/my-project/.venv",
@@ -122,6 +130,7 @@ Register a single environment for kernel discovery.
 ```
 
 **Fields:**
+
 - `path` - Absolute path to registered environment
 - `registered` - True if newly registered, false if already existed
 - `error` - Error message if registration failed, null otherwise
@@ -135,6 +144,7 @@ Register a single environment for kernel discovery.
 Remove an environment from kernel discovery.
 
 **Request Body:**
+
 ```json
 {
   "path": "/home/user/my-project/.venv"
@@ -142,6 +152,7 @@ Remove an environment from kernel discovery.
 ```
 
 **Response:**
+
 ```json
 {
   "path": "/home/user/my-project/.venv",
@@ -220,10 +231,10 @@ nb_venv_kernels register /path/to/.venv --json
 
 ### Dry Run
 
-The scan command supports `--no-update` flag to preview changes without modifying registries.
+The scan command supports `--dry-run` flag to preview changes without modifying registries.
 
 ```bash
-nb_venv_kernels scan /path/to/workspace --no-update
+nb_venv_kernels scan /path/to/workspace --dry-run
 ```
 
 ## JupyterLab Integration

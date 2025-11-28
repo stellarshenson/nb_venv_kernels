@@ -56,12 +56,21 @@ def is_uv_environment(env_path: str) -> bool:
     return False
 
 
-def _read_registry_file(registry_path: Path, include_missing: bool = False) -> List[str]:
+def _read_registry_file(registry_path: Path, include_missing: bool = False,
+                        include_names: bool = False) -> List:
     """Read environments from a single registry file.
+
+    Registry format supports optional custom names (tab-separated):
+        /path/to/env
+        /path/to/env\tcustom-name
 
     Args:
         registry_path: Path to the registry file
         include_missing: If True, include paths that don't exist on disk
+        include_names: If True, return list of (path, name) tuples instead of just paths
+
+    Returns:
+        List of paths (str) or list of (path, name) tuples if include_names=True
     """
     if not registry_path.exists():
         return []
@@ -71,9 +80,16 @@ def _read_registry_file(registry_path: Path, include_missing: bool = False) -> L
         for line in f:
             line = line.strip()
             if line and not line.startswith("#"):
-                env_path = os.path.abspath(os.path.expanduser(line))
+                # Parse tab-separated format: path[\tname]
+                parts = line.split('\t', 1)
+                env_path = os.path.abspath(os.path.expanduser(parts[0]))
+                custom_name = parts[1] if len(parts) > 1 else None
+
                 if include_missing or os.path.isdir(env_path):
-                    environments.append(env_path)
+                    if include_names:
+                        environments.append((env_path, custom_name))
+                    else:
+                        environments.append(env_path)
 
     return environments
 
@@ -98,13 +114,14 @@ def read_environments() -> List[str]:
     return environments
 
 
-def register_environment(env_path: str) -> bool:
+def register_environment(env_path: str, name: Optional[str] = None) -> bool:
     """Register an environment path in the appropriate registry.
 
     Auto-detects uv vs venv and writes to ~/.uv/ or ~/.venv/ accordingly.
 
     Args:
         env_path: Path to the environment directory (e.g., /path/to/.venv)
+        name: Optional custom display name for the environment
 
     Returns:
         True if newly registered, False if already registered.
@@ -129,10 +146,13 @@ def register_environment(env_path: str) -> bool:
     source = "uv" if is_uv_environment(env_path) else "venv"
     ensure_registry_dir(source)
 
-    # Append to registry
+    # Append to registry with optional name (tab-separated)
     registry_path = get_registry_path(source)
     with open(registry_path, "a", encoding="utf-8") as f:
-        f.write(env_path + "\n")
+        if name:
+            f.write(f"{env_path}\t{name}\n")
+        else:
+            f.write(env_path + "\n")
 
     return True
 
@@ -224,14 +244,16 @@ def list_environments() -> List[dict]:
     """List all registered environments with their status.
 
     Returns:
-        List of dicts with 'path', 'type', 'exists', 'has_kernel' keys.
+        List of dicts with 'path', 'type', 'exists', 'has_kernel', 'custom_name' keys.
         Types: 'venv', 'uv', 'conda'
     """
     environments = []
     seen = set()
 
     # Get venv environments from ~/.venv/environments.txt
-    for env_path in _read_registry_file(get_venv_registry_path(), include_missing=True):
+    for env_path, custom_name in _read_registry_file(get_venv_registry_path(),
+                                                      include_missing=True,
+                                                      include_names=True):
         if env_path in seen:
             continue
         seen.add(env_path)
@@ -241,11 +263,14 @@ def list_environments() -> List[dict]:
             "path": env_path,
             "type": "venv",
             "exists": os.path.isdir(env_path),
-            "has_kernel": has_kernel
+            "has_kernel": has_kernel,
+            "custom_name": custom_name
         })
 
     # Get uv environments from ~/.uv/environments.txt
-    for env_path in _read_registry_file(get_uv_registry_path(), include_missing=True):
+    for env_path, custom_name in _read_registry_file(get_uv_registry_path(),
+                                                      include_missing=True,
+                                                      include_names=True):
         if env_path in seen:
             continue
         seen.add(env_path)
@@ -255,10 +280,11 @@ def list_environments() -> List[dict]:
             "path": env_path,
             "type": "uv",
             "exists": os.path.isdir(env_path),
-            "has_kernel": has_kernel
+            "has_kernel": has_kernel,
+            "custom_name": custom_name
         })
 
-    # Get conda environments
+    # Get conda environments (no custom names for conda)
     for env_path in get_conda_environments():
         if env_path in seen:
             continue
@@ -269,7 +295,8 @@ def list_environments() -> List[dict]:
             "path": env_path,
             "type": "conda",
             "exists": os.path.isdir(env_path),
-            "has_kernel": has_kernel
+            "has_kernel": has_kernel,
+            "custom_name": None
         })
 
     return environments
@@ -292,7 +319,7 @@ def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
     """Remove non-existent environments from both registries.
 
     Returns:
-        Dict with 'removed' list of dicts containing 'path' and 'type'.
+        Dict with 'removed' list of dicts containing 'path', 'type', and 'custom_name'.
     """
     removed = []
 
@@ -311,11 +338,15 @@ def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
                 new_lines.append(line)
                 continue
 
-            env_path = os.path.abspath(os.path.expanduser(stripped))
+            # Parse tab-separated format: path[\tname]
+            parts = stripped.split('\t', 1)
+            env_path = os.path.abspath(os.path.expanduser(parts[0]))
+            custom_name = parts[1] if len(parts) > 1 else None
+
             if os.path.isdir(env_path):
                 new_lines.append(line)
             else:
-                removed.append({"path": env_path, "type": source})
+                removed.append({"path": env_path, "type": source, "custom_name": custom_name})
 
         # Write back if changed
         if len(new_lines) < len(lines):
@@ -406,9 +437,12 @@ def scan_directory(root_path: str, max_depth: int = 7,
                 for line in f:
                     stripped = line.strip()
                     if stripped and not stripped.startswith("#"):
-                        env_path = os.path.abspath(os.path.expanduser(stripped))
+                        # Parse tab-separated format: path[\tname]
+                        parts = stripped.split('\t', 1)
+                        env_path = os.path.abspath(os.path.expanduser(parts[0]))
+                        custom_name = parts[1] if len(parts) > 1 else None
                         if not os.path.isdir(env_path):
-                            not_available.append({"path": env_path, "type": source})
+                            not_available.append({"path": env_path, "type": source, "custom_name": custom_name})
     else:
         cleanup_result = cleanup_registries()
         not_available = cleanup_result["removed"]

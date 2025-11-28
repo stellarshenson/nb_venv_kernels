@@ -2,6 +2,24 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.1.45
+
+### Custom Environment Names
+
+- Added `-n/--name` option to `register` command for custom display names
+- Registry format extended with tab-separated names (backward compatible)
+- Custom names used in kernel selector display (venv/uv only, ignored for conda)
+
+### UI Improvements
+
+- Increased name column width from 25 to 30 characters
+- Changed remove action color to darker orange for better visibility
+
+### Frontend Kernel Refresh
+
+- JupyterLab extension now calls `refreshSpecs()` after scan completes
+- New kernels appear immediately in kernel picker without page refresh
+
 ## 1.1.42
 
 ### Workspace Boundary Validation
@@ -91,7 +109,7 @@
   - Animated spinner during scanning
   - Configurable depth via `--depth` or `c.VEnvKernelSpecManager.scan_depth` (default: 7)
   - Automatically cleans up non-existent environments from registries
-  - Skips common non-environment directories (node_modules, __pycache__, .git, etc.)
+  - Skips common non-environment directories (node_modules, **pycache**, .git, etc.)
 
 - **Enhanced list command**: Shows all environment types (conda, uv, venv)
   - Columns: NAME, TYPE, EXISTS, KERNEL, PATH

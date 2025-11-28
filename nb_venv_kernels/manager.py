@@ -460,7 +460,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
         """List all registered environments with their status.
 
         Returns:
-            List of dicts with keys: name, type, exists, has_kernel, path
+            List of dicts with keys: name, type, exists, has_kernel, path, custom_name
         """
         envs = _list_environments()
 
@@ -469,22 +469,26 @@ class VEnvKernelSpecManager(KernelSpecManager):
         for env in envs:
             env_type = env.get("type", "venv")
             path = env["path"]
+            custom_name = env.get("custom_name")
 
-            # Derive display name
-            env_dir = basename(path)
-            if env_dir in (".venv", "venv", ".env", "env"):
-                name = basename(dirname(path))
-            elif env_type == "conda" and env_dir.lower() in (
-                "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
-                "miniforge", "miniforge3", "mambaforge", "mambaforge3"
-            ):
-                name = "base"
+            # Use custom name if provided, otherwise derive from path
+            if custom_name:
+                name = custom_name
             else:
-                name = env_dir
+                env_dir = basename(path)
+                if env_dir in (".venv", "venv", ".env", "env"):
+                    name = basename(dirname(path))
+                elif env_type == "conda" and env_dir.lower() in (
+                    "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
+                    "miniforge", "miniforge3", "mambaforge", "mambaforge3"
+                ):
+                    name = "base"
+                else:
+                    name = env_dir
 
             # Determine type display
             if env_type == "conda":
-                if env_dir.lower() in (
+                if basename(path).lower() in (
                     "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
                     "miniforge", "miniforge3", "mambaforge", "mambaforge3"
                 ):
@@ -500,6 +504,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 "exists": env["exists"],
                 "has_kernel": env["has_kernel"],
                 "path": path,
+                "custom_name": custom_name,
             })
 
         return result
@@ -564,9 +569,10 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 global_conda_count += 1
 
         for item in result["not_available"]:
+            custom_name = item.get("custom_name")
             environments.append({
                 "action": "remove",
-                "name": self._get_env_display_name(item["path"], item["type"]),
+                "name": self._get_env_display_name(item["path"], item["type"], custom_name),
                 "type": item["type"],
                 "exists": False,
                 "has_kernel": False,
@@ -588,24 +594,25 @@ class VEnvKernelSpecManager(KernelSpecManager):
             "dry_run": dry_run,
         }
 
-    def register_environment(self, path):
+    def register_environment(self, path, name=None):
         """Register an environment for kernel discovery.
 
         Args:
             path: Path to the environment directory
+            name: Optional custom display name (ignored for conda environments)
 
         Returns:
-            Dict with keys: path, registered (bool), error (str or None)
+            Dict with keys: path, registered (bool), name (str or None), error (str or None)
         """
         path = abspath(path)
         try:
-            registered = register_environment(path)
+            registered = register_environment(path, name=name)
             # Invalidate cache
             self._venv_kernels_cache = None
             self._venv_kernels_cache_expiry = None
-            return {"path": path, "registered": registered, "error": None}
+            return {"path": path, "registered": registered, "name": name, "error": None}
         except ValueError as e:
-            return {"path": path, "registered": False, "error": str(e)}
+            return {"path": path, "registered": False, "name": name, "error": str(e)}
 
     def unregister_environment(self, path):
         """Remove an environment from kernel discovery.
@@ -624,8 +631,12 @@ class VEnvKernelSpecManager(KernelSpecManager):
             self._venv_kernels_cache_expiry = None
         return {"path": path, "unregistered": unregistered}
 
-    def _get_env_display_name(self, env_path, env_type):
+    def _get_env_display_name(self, env_path, env_type, custom_name=None):
         """Get display name for an environment."""
+        # Use custom name if provided
+        if custom_name:
+            return custom_name
+
         env_dir = basename(env_path)
 
         if env_type in ("venv", "uv"):

@@ -6,6 +6,7 @@ import os
 import sys
 import threading
 import time
+from importlib.metadata import version as get_version
 
 from .manager import (
     VEnvKernelSpecManager,
@@ -20,7 +21,7 @@ class Colors:
     """ANSI color codes for terminal output."""
     GREEN = "\033[32m"
     BLUE = "\033[94m"
-    ORANGE = "\033[38;5;208m"
+    ORANGE = "\033[33m"  # Darker orange/yellow
     RED = "\033[31m"
     RESET = "\033[0m"
 
@@ -95,13 +96,19 @@ def _is_conda_global(env_path: str) -> bool:
     return basename in base_names
 
 
-def _get_env_display_name(env_path: str, env_type: str) -> str:
+def _get_env_display_name(env_path: str, env_type: str, custom_name: str = None) -> str:
     """Get display name for an environment.
 
-    For venv/uv: use parent directory name (project name)
-    For conda base: use 'base'
-    For conda envs: use the env directory name
+    Priority:
+    1. Custom name if provided
+    2. For venv/uv: parent directory name (project name)
+    3. For conda base: 'base'
+    4. For conda envs: the env directory name
     """
+    # Use custom name if provided (venv/uv only)
+    if custom_name:
+        return custom_name
+
     basename = os.path.basename(env_path)
 
     # For venv/uv, common venv folder names -> use parent (project) name
@@ -326,20 +333,23 @@ Commands:
   config show         Show current config location and status
 
 Options:
+  register -n NAME    Custom display name for the environment
   scan --depth N      Maximum directory depth to scan (default: 7)
-  scan --no-update    Dry run: scan and report without changes
+  scan --dry-run      Dry run: scan and report without changes
 
 Notes:
   - scan and register also cleanup non-existent environments from registries
   - conda environments found during scan are reported but not registered
     (they are discovered automatically via conda env list)
+  - custom names are stored in registry and used in kernel selector
 
 Examples:
   nb_venv_kernels scan                    # Scan current directory
   nb_venv_kernels scan /path/to/projects  # Scan specific directory
   nb_venv_kernels scan --depth 3          # Limit scan depth
-  nb_venv_kernels scan --no-update        # Dry run mode
+  nb_venv_kernels scan --dry-run          # Dry run mode
   nb_venv_kernels register /path/to/.venv
+  nb_venv_kernels register .venv -n "My Project"  # With custom name
   nb_venv_kernels list
 """)
 
@@ -356,6 +366,11 @@ def main():
         action="store_true",
         help="Show this help message",
     )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Show version and exit",
+    )
 
     subparsers = parser.add_subparsers(dest="command")
 
@@ -367,6 +382,10 @@ def main():
     register_parser.add_argument(
         "path",
         help="Path to the environment directory (e.g., .venv or /path/to/.venv)",
+    )
+    register_parser.add_argument(
+        "-n", "--name",
+        help="Custom display name for the environment (ignored for conda)",
     )
     register_parser.add_argument(
         "--json",
@@ -381,7 +400,12 @@ def main():
     )
     unregister_parser.add_argument(
         "path",
+        nargs="?",
         help="Path to the environment directory",
+    )
+    unregister_parser.add_argument(
+        "-n", "--name",
+        help="Unregister by custom name instead of path",
     )
 
     # list command
@@ -413,7 +437,7 @@ def main():
         help="Maximum directory depth to scan (default: from config, usually 7)",
     )
     scan_parser.add_argument(
-        "--no-update",
+        "--dry-run",
         action="store_true",
         help="Dry run: scan and report without registering or removing",
     )
@@ -441,6 +465,10 @@ def main():
 
     args = parser.parse_args()
 
+    if args.version:
+        print(f"nb_venv_kernels {get_version('nb_venv_kernels')}")
+        sys.exit(0)
+
     if args.help or args.command is None:
         print_help()
         sys.exit(0)
@@ -462,7 +490,8 @@ def main():
                     print(f"Error: {error_msg}", file=sys.stderr)
                 sys.exit(1)
 
-        result = manager.register_environment(args.path)
+        custom_name = getattr(args, 'name', None)
+        result = manager.register_environment(args.path, name=custom_name)
 
         if getattr(args, 'json', False):
             print(json.dumps(result, indent=2))
@@ -477,7 +506,21 @@ def main():
             print()
 
     elif args.command == "unregister":
-        result = manager.unregister_environment(args.path)
+        if args.name:
+            # Find path by custom name
+            envs = manager.list_environments()
+            matches = [e for e in envs if e.get("custom_name") == args.name]
+            if not matches:
+                print(f"No environment found with name: {args.name}", file=sys.stderr)
+                sys.exit(1)
+            path = matches[0]["path"]
+        elif args.path:
+            path = args.path
+        else:
+            print("Error: Either path or --name is required", file=sys.stderr)
+            sys.exit(1)
+
+        result = manager.unregister_environment(path)
         if result["unregistered"]:
             print(f"Unregistered: {result['path']}")
         else:
@@ -508,8 +551,10 @@ def main():
             # JSON output with workspace-relative paths
             output = []
             for env in envs:
+                custom_name = env.get("custom_name")
                 output.append({
-                    "name": _get_env_display_name(env['path'], env.get("type", "venv")),
+                    "name": _get_env_display_name(env['path'], env.get("type", "venv"), custom_name),
+                    "custom_name": custom_name,
                     "type": _get_env_type_display(env['path'], env.get("type", "venv")),
                     "exists": env["exists"],
                     "has_kernel": env["has_kernel"],
@@ -521,10 +566,11 @@ def main():
             print("Use 'nb_venv_kernels register <path>' or 'nb_venv_kernels scan' to add environments.")
         else:
             print()
-            print(f"{'name':<25} {'type':<16} {'exists':<8} {'kernel':<8} {'path (relative to workspace)'}")
+            print(f"{'name':<30} {'type':<16} {'exists':<8} {'kernel':<8} {'path (relative to workspace)'}")
             print("-" * 110)
             for env in envs:
-                name = _get_env_display_name(env['path'], env.get("type", "venv"))
+                custom_name = env.get("custom_name")
+                name = _get_env_display_name(env['path'], env.get("type", "venv"), custom_name)
                 env_type = _get_env_type_display(env['path'], env.get("type", "venv"))
                 exists = "yes" if env["exists"] else Colors.red("no") + " " * 6
                 kernel = "yes" if env["has_kernel"] else Colors.red("no") + " " * 6
@@ -533,7 +579,7 @@ def main():
                     display_path = env['path']
                 else:
                     display_path = _relative_path(env['path'], workspace)
-                print(f"{name:<25} {env_type:<16} {exists:<8} {kernel:<8} {display_path}")
+                print(f"{name:<30} {env_type:<16} {exists:<8} {kernel:<8} {display_path}")
         print()
 
     elif args.command == "scan":
@@ -547,7 +593,7 @@ def main():
 
         # Use configured depth if not specified via CLI
         depth = args.depth if args.depth is not None else manager.scan_depth
-        dry_run = getattr(args, 'no_update', False)
+        dry_run = getattr(args, 'dry_run', False)
         json_output = getattr(args, 'json', False)
 
         # No spinner for JSON output (machine-to-machine)
@@ -609,7 +655,7 @@ def main():
         else:
             if environments:
                 print()
-                print(f"{'action':<10} {'name':<25} {'type':<16} {'exists':<8} {'kernel':<8} {'path (relative to workspace)'}")
+                print(f"{'action':<10} {'name':<30} {'type':<16} {'exists':<8} {'kernel':<8} {'path (relative to workspace)'}")
                 print("-" * 130)
                 for env in environments:
                     # Pad action before colorizing to maintain alignment
@@ -621,14 +667,14 @@ def main():
                         display_path = env["path"]
                     else:
                         display_path = _relative_path(env["path"], workspace)
-                    print(f"{action_colored} {env['name']:<25} {env['type']:<16} {exists_str:<8} {kernel_str:<8} {display_path}")
+                    print(f"{action_colored} {env['name']:<30} {env['type']:<16} {exists_str:<8} {kernel_str:<8} {display_path}")
                 print()
 
             if total_add == 0 and total_keep == 0 and total_remove == 0:
                 print("No environments found.")
             else:
                 parts = []
-                # Use past tense for actual changes, present for dry run
+                # Use past tense for actual changes, present for dry_run
                 if dry_run:
                     if total_add > 0:
                         parts.append(f"{total_add} add")

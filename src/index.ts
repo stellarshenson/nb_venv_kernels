@@ -61,7 +61,9 @@ async function scanEnvironments(): Promise<IScanResult> {
 /**
  * Sort environments to match CLI order: action -> type -> name
  */
-function sortEnvironments(environments: IScanEnvironment[]): IScanEnvironment[] {
+function sortEnvironments(
+  environments: IScanEnvironment[]
+): IScanEnvironment[] {
   const actionOrder: Record<string, number> = { add: 0, keep: 1, remove: 2 };
   const typeOrder: Record<string, number> = { conda: 0, uv: 1, venv: 2 };
 
@@ -69,11 +71,15 @@ function sortEnvironments(environments: IScanEnvironment[]): IScanEnvironment[] 
     // Sort by action first
     const actionDiff =
       (actionOrder[a.action] ?? 3) - (actionOrder[b.action] ?? 3);
-    if (actionDiff !== 0) return actionDiff;
+    if (actionDiff !== 0) {
+      return actionDiff;
+    }
 
     // Then by type
     const typeDiff = (typeOrder[a.type] ?? 3) - (typeOrder[b.type] ?? 3);
-    if (typeDiff !== 0) return typeDiff;
+    if (typeDiff !== 0) {
+      return typeDiff;
+    }
 
     // Then by name alphabetically
     return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
@@ -95,9 +101,15 @@ function buildResultsContent(result: IScanResult): string {
     intro = '<p>No environments found.</p>';
   } else {
     const parts = [];
-    if (added > 0) parts.push(`${added} new`);
-    if (kept > 0) parts.push(`${kept} kept`);
-    if (removed > 0) parts.push(`${removed} missing`);
+    if (added > 0) {
+      parts.push(`${added} new`);
+    }
+    if (kept > 0) {
+      parts.push(`${kept} kept`);
+    }
+    if (removed > 0) {
+      parts.push(`${removed} missing`);
+    }
     intro = `<p>Found ${total} environment${total !== 1 ? 's' : ''}: ${parts.join(', ')}.</p>`;
   }
 
@@ -110,8 +122,12 @@ function buildResultsContent(result: IScanResult): string {
 
   const rows = sortedEnvs
     .map(env => {
-      const existsText = env.exists ? 'yes' : '<span class="nb-venv-no">no</span>';
-      const kernelText = env.has_kernel ? 'yes' : '<span class="nb-venv-no">no</span>';
+      const existsText = env.exists
+        ? 'yes'
+        : '<span class="nb-venv-no">no</span>';
+      const kernelText = env.has_kernel
+        ? 'yes'
+        : '<span class="nb-venv-no">no</span>';
       const actionClass = `nb-venv-action-${env.action}`;
 
       return `<tr>
@@ -138,7 +154,9 @@ function buildResultsContent(result: IScanResult): string {
   }
 
   // Check if any environments are missing a kernel
-  const missingKernel = result.environments.some(e => e.exists && !e.has_kernel);
+  const missingKernel = result.environments.some(
+    e => e.exists && !e.has_kernel
+  );
   const kernelNote = missingKernel
     ? '<p style="margin-top: 8px; font-size: 0.9em; color: var(--jp-ui-font-color2);"><em>Install ipykernel in environments without kernel to use them in JupyterLab.</em></p>'
     : '';
@@ -269,7 +287,8 @@ async function executeScanCommand(): Promise<void> {
  */
 const plugin: JupyterFrontEndPlugin<void> = {
   id: 'nb_venv_kernels:plugin',
-  description: 'Discovers Jupyter kernels from conda, venv, and uv environments',
+  description:
+    'Discovers Jupyter kernels from conda, venv, and uv environments',
   autoStart: true,
   optional: [IMainMenu, ICommandPalette],
   activate: (

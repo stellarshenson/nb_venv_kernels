@@ -44,6 +44,7 @@ subprocess.check_output([CONDA_EXE, "info", "--json"])
 ```
 
 Returns JSON structure:
+
 ```json
 {
   "envs": [
@@ -57,12 +58,14 @@ Returns JSON structure:
 ```
 
 **Key points**:
+
 - `envs` array contains ALL environments including prefix-based (created with `--prefix`)
 - `envs_dirs` lists standard environment directories
 - Prefix-based environments appear in `envs` but not in `conda env list` output
 - Build directories (`conda-bld/`) are excluded
 
 Environment naming logic:
+
 - Base environment -> configured `base_name` (default: "base")
 - Standard envs -> directory name (e.g., `myenv`)
 - Prefix envs -> directory name with disambiguation if needed
@@ -78,11 +81,13 @@ for env_name, env_path in all_envs.items():
 ```
 
 Search path pattern:
+
 ```
 {env_path}/share/jupyter/kernels/*/kernel.json
 ```
 
 Example locations:
+
 ```
 /opt/conda/share/jupyter/kernels/python3/kernel.json
 /opt/conda/envs/myenv/share/jupyter/kernels/python3/kernel.json
@@ -92,29 +97,37 @@ Example locations:
 ## Step 3: Kernelspec Modification
 
 Original `kernel.json` (installed by ipykernel with `--sys-prefix`):
+
 ```json
 {
   "argv": [
     "/opt/conda/envs/myenv/bin/python",
-    "-m", "ipykernel_launcher",
-    "-f", "{connection_file}"
+    "-m",
+    "ipykernel_launcher",
+    "-f",
+    "{connection_file}"
   ],
   "display_name": "Python 3 (ipykernel)",
   "language": "python",
-  "metadata": {"debugger": true}
+  "metadata": { "debugger": true }
 }
 ```
 
 Modified by nb_conda_kernels:
+
 ```json
 {
   "argv": [
-    "python", "-m", "nb_conda_kernels.runner",
+    "python",
+    "-m",
+    "nb_conda_kernels.runner",
     "/opt/conda",
     "/opt/conda/envs/myenv",
     "/opt/conda/envs/myenv/bin/python",
-    "-m", "ipykernel_launcher",
-    "-f", "{connection_file}"
+    "-m",
+    "ipykernel_launcher",
+    "-f",
+    "{connection_file}"
   ],
   "display_name": "Python [conda env:myenv]",
   "language": "python",
@@ -131,6 +144,7 @@ Modified by nb_conda_kernels:
 ```
 
 **Modifications**:
+
 - `argv` prepended with runner script and conda/env paths
 - `display_name` reformatted using configurable template
 - `metadata` enriched with environment information
@@ -140,17 +154,20 @@ Modified by nb_conda_kernels:
 When user selects a kernel, Jupyter executes the modified argv. The runner script (`nb_conda_kernels/runner.py`) activates the target environment before launching the kernel.
 
 **Unix execution**:
+
 ```bash
 . '/opt/conda/bin/activate' '/opt/conda/envs/myenv' && \
 exec /opt/conda/envs/myenv/bin/python -m ipykernel_launcher -f {connection_file}
 ```
 
 **Windows execution**:
+
 ```batch
 call %CONDA_PREFIX%\Scripts\activate.bat %ENV_PATH% && %COMMAND%
 ```
 
 The runner ensures:
+
 - Environment variables are set correctly (CONDA_PREFIX, PATH, etc.)
 - Kernel process replaces runner process (via `exec`)
 - No orphan processes remain
@@ -166,40 +183,42 @@ c.ServerApp.kernel_spec_manager_class = "nb_conda_kernels.CondaKernelSpecManager
 
 The `CondaKernelSpecManager` overrides three key methods:
 
-| Method | Purpose |
-|--------|---------|
-| `find_kernel_specs()` | Returns dict of kernel names to resource directories |
-| `get_kernel_spec(name)` | Returns KernelSpec instance for given name |
-| `get_all_specs()` | Returns full metadata for all kernels |
+| Method                  | Purpose                                              |
+| ----------------------- | ---------------------------------------------------- |
+| `find_kernel_specs()`   | Returns dict of kernel names to resource directories |
+| `get_kernel_spec(name)` | Returns KernelSpec instance for given name           |
+| `get_all_specs()`       | Returns full metadata for all kernels                |
 
 ## Caching Strategy
 
 Two-level caching minimizes overhead:
 
-| Cache | TTL | Contents |
-|-------|-----|----------|
-| `_conda_info_cache` | 60s | Output of `conda info --json` |
-| `_conda_kernels_cache` | 60s | Processed KernelSpec objects |
+| Cache                  | TTL | Contents                      |
+| ---------------------- | --- | ----------------------------- |
+| `_conda_info_cache`    | 60s | Output of `conda info --json` |
+| `_conda_kernels_cache` | 60s | Processed KernelSpec objects  |
 
 Background threading prevents blocking:
+
 - First call blocks while fetching conda info
 - Subsequent calls return cached data
 - Cache refresh happens asynchronously in background thread
 
 ## Configuration Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `base_name` | "base" | Display name for root environment |
-| `conda_only` | False | Show only conda kernels, hide system kernels |
-| `env_filter` | None | Regex to exclude environments |
-| `name_format` | `{language} [conda env:{environment}]` | Display name template |
-| `kernelspec_path` | None | Optionally install specs to disk |
-| `enable_debugger` | None | Override debugger metadata |
+| Option            | Default                                | Description                                  |
+| ----------------- | -------------------------------------- | -------------------------------------------- |
+| `base_name`       | "base"                                 | Display name for root environment            |
+| `conda_only`      | False                                  | Show only conda kernels, hide system kernels |
+| `env_filter`      | None                                   | Regex to exclude environments                |
+| `name_format`     | `{language} [conda env:{environment}]` | Display name template                        |
+| `kernelspec_path` | None                                   | Optionally install specs to disk             |
+| `enable_debugger` | None                                   | Override debugger metadata                   |
 
 ## Why Standard Jupyter Doesn't See These Kernels
 
 Jupyter searches for kernelspecs in fixed locations:
+
 - `{sys.prefix}/share/jupyter/kernels/` - current environment
 - `~/.local/share/jupyter/kernels/` - user installation
 - `/usr/share/jupyter/kernels/` - system-wide

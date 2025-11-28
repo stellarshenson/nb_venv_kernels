@@ -38,7 +38,7 @@ Results display in a modal with action indicators.
 - **Programmatic API** - REST endpoints and Python API for automation (`--json` flag)
 - **Zero config** - auto-enables on install, works immediately
 
-*Built because someone got tired of typing `python -m ipykernel install --user --name=...` for the 42nd time.*
+_Built because someone got tired of typing `python -m ipykernel install --user --name=...` for the 42nd time._
 
 ## Install
 
@@ -77,6 +77,7 @@ nb_venv_kernels scan --depth 3            # Limit recursion depth (default: 5)
 ```
 
 The scan command automatically:
+
 - Finds venv and uv environments by detecting `bin/python`
 - Registers them in the appropriate registry (`~/.venv/` or `~/.uv/`)
 - Cleans up non-existent environments from registries
@@ -86,8 +87,11 @@ The scan command automatically:
 
 ```bash
 nb_venv_kernels register /path/to/.venv
+nb_venv_kernels register /path/to/.venv -n "My Project"  # With custom display name
 nb_venv_kernels unregister /path/to/.venv
 ```
+
+Custom names are stored in the registry and used in kernel display names (venv/uv only, ignored for conda).
 
 ### Listing Environments
 
@@ -125,6 +129,13 @@ Environments are registered in separate files based on their source:
 - **venv**: `~/.venv/environments.txt`
 - **uv**: `~/.uv/environments.txt`
 - **conda**: `~/.conda/environments.txt` + global environments from `conda env list`
+
+Registry format is plain text with optional tab-separated custom names:
+
+```
+/path/to/env
+/path/to/other/env	custom-name
+```
 
 The `register` command auto-detects uv environments via `pyvenv.cfg` and writes to the appropriate registry.
 
