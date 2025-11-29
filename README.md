@@ -10,6 +10,8 @@
 
 Use Python virtual environments as Jupyter kernels. Discovers and registers kernels from venv, uv, and conda environments in JupyterLab's kernel selector.
 
+This kernel spec manager is used by [Stellars Cookiecutter Data Science](https://github.com/stellarshenson/cookiecutter-data-science) template 
+
 Discovered environments appear in JupyterLab's kernel selector.
 
 ![UV and Conda virtual environments co-exist and are properly discovered](.resources/screenshot.png)
