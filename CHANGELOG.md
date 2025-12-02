@@ -2,6 +2,15 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.9
+
+### Configurable Scan Exclusions
+
+- Added `scan_config.json` for configurable directory and path exclusions
+- Scan now excludes uv cache directories (`@cache`, `archive-v0`, `environments-v*`)
+- Cleanup removes cache paths from registry automatically
+- Exclude patterns loaded from `nb_venv_kernels/scan_config.json`
+
 ## 1.2.8
 
 ### Consistent Sort Order

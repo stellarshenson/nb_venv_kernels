@@ -171,3 +171,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 56. **Task - Consistent sort order**: Fixed inconsistent sorting between list and scan commands<br>
     **Result**: Changed list command to use `e["name"]` instead of `_get_env_display_name()` for sorting. Both list and scan now use manager's conflict-resolved names for alphabetical sorting within type groups. Published v1.2.8
+
+57. **Task - Configurable scan exclusions**: Externalized scan exclusion patterns to JSON config file<br>
+    **Result**: Created `scan_config.json` with `skip_directories` and `exclude_path_patterns` arrays. Added `_load_scan_config()`, `_get_skip_directories()`, and `_is_cache_path()` functions. Scan now skips `@cache`, `archive-v0`, `environments-v*` directories. Cleanup removes cache paths from registry. Added `TestScanExclusions` test class with cache directory and path pattern tests

@@ -1,0 +1,43 @@
+{
+  "skip_directories": [
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    ".npm",
+    ".yarn",
+    ".pnpm",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".tox",
+    ".nox",
+    ".eggs",
+    "__pypackages__",
+    "dist",
+    "build",
+    "site-packages",
+    "lib",
+    "lib64",
+    "include",
+    ".vscode",
+    ".idea",
+    ".cache",
+    ".coverage",
+    "coverage",
+    "htmlcov",
+    "@cache",
+    ".ipynb_checkpoints",
+    "archive-v0",
+    "environments-v1",
+    "environments-v2"
+  ],
+  "exclude_path_patterns": [
+    "/@cache/",
+    "/uv/archive-v",
+    "/uv/environments-v",
+    "/.local/share/uv/",
+    "/.cache/uv/"
+  ]
+}

@@ -537,8 +537,30 @@ def _check_has_kernel(kernel_path: str) -> bool:
         return False
 
 
+def _load_scan_config() -> Dict:
+    """Load scan configuration from JSON file."""
+    config_path = Path(__file__).parent / "scan_config.json"
+    if config_path.exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"skip_directories": [], "exclude_path_patterns": []}
+
+
+def _get_skip_directories() -> set:
+    """Get set of directory names to skip during scan."""
+    config = _load_scan_config()
+    return set(config.get("skip_directories", []))
+
+
+def _is_cache_path(path: str) -> bool:
+    """Check if path matches any exclude pattern from config."""
+    config = _load_scan_config()
+    patterns = config.get("exclude_path_patterns", [])
+    return any(pattern in path for pattern in patterns)
+
+
 def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
-    """Remove non-existent environments from both registries.
+    """Remove non-existent and cache environments from both registries.
 
     Returns:
         Dict with 'removed' list of dicts containing 'path', 'type', and 'custom_name'.
@@ -565,7 +587,8 @@ def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
             env_path = os.path.abspath(os.path.expanduser(parts[0]))
             custom_name = parts[1] if len(parts) > 1 else None
 
-            if is_valid_environment(env_path):
+            # Remove if invalid or is a cache path
+            if is_valid_environment(env_path) and not _is_cache_path(env_path):
                 new_lines.append(line)
             else:
                 removed.append({"path": env_path, "type": source, "custom_name": custom_name})
@@ -745,26 +768,13 @@ def scan_directory(root_path: str, max_depth: int = 7,
             if entry.startswith(".") and entry not in venv_names:
                 continue
 
-            # Skip common non-environment directories
-            skip_dirs = {
-                # Version control
-                ".git", ".hg", ".svn",
-                # Node/JS
-                "node_modules", ".npm", ".yarn", ".pnpm",
-                # Python build/cache
-                "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache",
-                ".tox", ".nox", ".eggs", "__pypackages__",
-                "dist", "build",
-                # Package internals (don't recurse into installed packages)
-                "site-packages", "lib", "lib64", "include",
-                # IDE/Editor
-                ".vscode", ".idea",
-                # Other caches
-                ".cache", ".coverage", "coverage", "htmlcov",
-                # Jupyter
-                ".ipynb_checkpoints",
-            }
+            # Skip directories from config
+            skip_dirs = _get_skip_directories()
             if entry in skip_dirs or entry.endswith(".egg-info"):
+                continue
+
+            # Skip uv cache path patterns
+            if entry == "uv" and ("/share/" in current_path or current_path.endswith("share")):
                 continue
 
             full_path = os.path.join(current_path, entry)

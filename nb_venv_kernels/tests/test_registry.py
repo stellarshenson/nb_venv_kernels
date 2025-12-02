@@ -469,3 +469,36 @@ class TestRegistrySanitization:
         # Cleanup
         unregister_environment(venv1_path)
         unregister_environment(venv2_path)
+
+
+class TestScanExclusions:
+    """Tests for scan exclusion patterns."""
+
+    def test_scan_skips_cache_directories(self, temp_dir):
+        """Test that scan skips @cache and uv cache directories."""
+        # Create a fake cache structure with venv inside
+        cache_dir = os.path.join(temp_dir, "@cache", "uv", "environments-v2")
+        os.makedirs(cache_dir)
+        cache_venv = os.path.join(cache_dir, "abc123")
+        subprocess.run(["python", "-m", "venv", cache_venv], check=True, capture_output=True)
+
+        # Create a normal venv
+        normal_venv = os.path.join(temp_dir, "project", ".venv")
+        os.makedirs(os.path.dirname(normal_venv))
+        subprocess.run(["python", "-m", "venv", normal_venv], check=True, capture_output=True)
+
+        # Scan with dry_run
+        result = scan_directory(temp_dir, max_depth=5, dry_run=True)
+
+        # Should find normal venv but not cache venv
+        assert normal_venv in result["registered"]
+        assert cache_venv not in result["registered"]
+
+    def test_cleanup_removes_cache_paths(self, temp_dir):
+        """Test that cleanup removes cache paths from registry."""
+        from nb_venv_kernels.registry import cleanup_registries, _is_cache_path
+
+        # Verify cache path detection
+        assert _is_cache_path("/home/user/@cache/uv/environments-v2/abc") is True
+        assert _is_cache_path("/home/user/.local/share/uv/cache") is True
+        assert _is_cache_path("/home/user/project/.venv") is False
