@@ -284,7 +284,8 @@ def _has_kernelspec(env_path: str) -> bool:
     return _check_has_kernel(kernel_path)
 
 
-def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[bool, bool]:
+def register_environment(env_path: str, name: Optional[str] = None,
+                         require_kernelspec: bool = False) -> Tuple[bool, bool]:
     """Register an environment path in the appropriate registry.
 
     Auto-detects uv vs venv and writes to ~/.uv/ or ~/.venv/ accordingly.
@@ -292,12 +293,10 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
     If custom name conflicts, appends suffix and warns to stderr.
     Thread/multiprocess safe using file locking.
 
-    Only registers environments that have a valid Jupyter kernelspec installed
-    (ipykernel creates share/jupyter/kernels/*/kernel.json).
-
     Args:
         env_path: Path to the environment directory (e.g., /path/to/.venv)
         name: Optional custom display name for the environment
+        require_kernelspec: If True, only register environments with ipykernel installed
 
     Returns:
         Tuple of (registered, updated):
@@ -307,7 +306,7 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
 
     Raises:
         ValueError: If path doesn't exist, not a valid Python environment,
-                   or doesn't have ipykernel installed.
+                   or (when require_kernelspec=True) doesn't have ipykernel installed.
     """
     import sys
 
@@ -322,8 +321,8 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
     if not os.path.exists(python_path) and not os.path.exists(python_path_win):
         raise ValueError(f"Not a valid Python environment: {env_path}")
 
-    # Check for kernelspec (ipykernel must be installed)
-    if not _has_kernelspec(env_path):
+    # Check for kernelspec (ipykernel must be installed) - only if required
+    if require_kernelspec and not _has_kernelspec(env_path):
         raise ValueError(f"No kernelspec found (ipykernel not installed): {env_path}")
 
     # Detect source and use appropriate registry
@@ -579,13 +578,16 @@ def _is_cache_path(path: str) -> bool:
     return any(pattern in path for pattern in patterns)
 
 
-def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
+def cleanup_registries(require_kernelspec: bool = False) -> Dict[str, List[Dict[str, str]]]:
     """Remove invalid environments from both registries.
 
     Removes environments that:
     - Don't exist on disk
     - Are cache paths (uv cache directories)
-    - Don't have a valid kernelspec (ipykernel not installed)
+    - Don't have a valid kernelspec (only when require_kernelspec=True)
+
+    Args:
+        require_kernelspec: If True, also remove environments without ipykernel installed
 
     Returns:
         Dict with 'removed' list of dicts containing 'path', 'type', and 'custom_name'.
@@ -612,10 +614,13 @@ def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
             env_path = os.path.abspath(os.path.expanduser(parts[0]))
             custom_name = parts[1] if len(parts) > 1 else None
 
-            # Remove if invalid, cache path, or no kernelspec
-            if (is_valid_environment(env_path)
-                    and not _is_cache_path(env_path)
-                    and _has_kernelspec(env_path)):
+            # Remove if invalid or cache path
+            is_valid = is_valid_environment(env_path) and not _is_cache_path(env_path)
+            # Also check kernelspec only if required
+            if require_kernelspec:
+                is_valid = is_valid and _has_kernelspec(env_path)
+
+            if is_valid:
                 new_lines.append(line)
             else:
                 removed.append({"path": env_path, "type": source, "custom_name": custom_name})
@@ -726,23 +731,24 @@ def is_global_conda_environment(path: str) -> bool:
 
 
 def scan_directory(root_path: str, max_depth: int = 7,
-                   dry_run: bool = False) -> Dict[str, List]:
+                   dry_run: bool = False,
+                   require_kernelspec: bool = False) -> Dict[str, List]:
     """Scan directory tree for virtual environments.
 
     Searches for venv, uv, and conda environments. Registers found
     environments in appropriate registries and cleans up non-existent ones.
     Also sanitizes duplicate names in registries.
 
-    Only environments with a valid kernelspec (ipykernel installed) are registered.
-    Environments without kernelspec are reported in 'no_kernel' list.
-
     Args:
         root_path: Directory to start scanning from
         max_depth: Maximum depth to recurse (default: 7, None = unlimited)
         dry_run: If True, only report without making changes
+        require_kernelspec: If True, only register environments with ipykernel installed.
+                           Environments without kernelspec are reported in 'ignore' list.
+                           If False (default), all valid environments are registered.
 
     Returns:
-        Dict with 'registered', 'updated', 'skipped', 'no_kernel', 'conda_found', 'not_available' lists.
+        Dict with 'registered', 'updated', 'skipped', 'ignore', 'conda_found', 'not_available' lists.
     """
     root_path = os.path.abspath(os.path.expanduser(root_path))
 
@@ -773,13 +779,13 @@ def scan_directory(root_path: str, max_depth: int = 7,
                         if not is_valid_environment(env_path):
                             not_available.append({"path": env_path, "type": source, "custom_name": custom_name})
     else:
-        cleanup_result = cleanup_registries()
+        cleanup_result = cleanup_registries(require_kernelspec=require_kernelspec)
         not_available = cleanup_result["removed"]
 
     registered = []
     updated = []
     skipped = []
-    no_kernel = []
+    ignore = []
     conda_found = []
 
     # Common venv directory names
@@ -820,8 +826,9 @@ def scan_directory(root_path: str, max_depth: int = 7,
                 else:
                     # Check if environment has kernelspec (ipykernel installed)
                     has_kernel = _has_kernelspec(full_path)
-                    if not has_kernel:
-                        no_kernel.append(full_path)
+                    if require_kernelspec and not has_kernel:
+                        # Only ignore if require_kernelspec is True
+                        ignore.append(full_path)
                     elif dry_run:
                         # In dry run, check if already registered
                         existing = read_environments()
@@ -830,9 +837,11 @@ def scan_directory(root_path: str, max_depth: int = 7,
                         else:
                             registered.append(full_path)
                     else:
-                        # Try to register (will succeed since we checked kernelspec)
+                        # Try to register
                         try:
-                            was_registered, was_updated = register_environment(full_path)
+                            was_registered, was_updated = register_environment(
+                                full_path, require_kernelspec=require_kernelspec
+                            )
                             if was_registered:
                                 registered.append(full_path)
                             elif was_updated:
@@ -840,7 +849,8 @@ def scan_directory(root_path: str, max_depth: int = 7,
                             else:
                                 skipped.append(full_path)
                         except ValueError:
-                            pass  # Should not happen since we pre-checked
+                            # Only happens if require_kernelspec=True and no kernel
+                            ignore.append(full_path)
                 # Don't recurse into environments
                 continue
 
@@ -862,7 +872,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
         "registered": registered,
         "updated": updated,
         "skipped": skipped,
-        "no_kernel": no_kernel,
+        "ignore": ignore,
         "not_available": not_available,
         "conda_found": conda_found,
     }

@@ -104,14 +104,27 @@ class TestEnvironmentRegistration:
         with pytest.raises(ValueError):
             register_environment(non_venv)
 
-    def test_register_venv_without_kernelspec(self, temp_dir):
-        """Test that registering a venv without kernelspec raises ValueError."""
+    def test_register_venv_without_kernelspec_allowed_by_default(self, temp_dir):
+        """Test that registering a venv without kernelspec succeeds by default."""
         venv_path = os.path.join(temp_dir, "no-kernel-venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        # No ipykernel installed - should still register with default require_kernelspec=False
+
+        registered, updated = register_environment(venv_path)
+        assert registered is True
+        assert updated is False
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_register_venv_without_kernelspec_rejected_when_required(self, temp_dir):
+        """Test that registering a venv without kernelspec raises ValueError when required."""
+        venv_path = os.path.join(temp_dir, "no-kernel-req-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
         # No ipykernel installed
 
         with pytest.raises(ValueError, match="No kernelspec found"):
-            register_environment(venv_path)
+            register_environment(venv_path, require_kernelspec=True)
 
     def test_double_registration(self, temp_dir):
         """Test registering same environment twice."""
@@ -340,8 +353,8 @@ class TestDirectoryScanning:
         assert "registered" in result
         assert venv_path in result["registered"]
 
-    def test_scan_reports_venvs_without_kernel(self, temp_dir):
-        """Test that scan reports venvs without kernelspec in no_kernel list."""
+    def test_scan_reports_venvs_without_kernel_when_required(self, temp_dir):
+        """Test that scan reports venvs without kernelspec in ignore list when require_kernelspec=True."""
         # Create nested project with venv but NO ipykernel
         project_dir = os.path.join(temp_dir, "project-no-kernel")
         os.makedirs(project_dir)
@@ -349,13 +362,32 @@ class TestDirectoryScanning:
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
         # No ipykernel installed
 
-        # Scan
+        # Scan with require_kernelspec=True
+        result = scan_directory(temp_dir, max_depth=3, dry_run=True, require_kernelspec=True)
+
+        # Should be in ignore list, not registered
+        assert "ignore" in result
+        assert venv_path in result["ignore"]
+        assert venv_path not in result.get("registered", [])
+
+    def test_scan_registers_venvs_without_kernel_by_default(self, temp_dir):
+        """Test that scan registers venvs without kernelspec when require_kernelspec=False (default)."""
+        # Create nested project with venv but NO ipykernel
+        project_dir = os.path.join(temp_dir, "project-no-kernel-default")
+        os.makedirs(project_dir)
+        venv_path = os.path.join(project_dir, ".venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        # No ipykernel installed
+
+        # Scan with default require_kernelspec=False
         result = scan_directory(temp_dir, max_depth=3, dry_run=True)
 
-        # Should be in no_kernel list, not registered
-        assert "no_kernel" in result
-        assert venv_path in result["no_kernel"]
-        assert venv_path not in result.get("registered", [])
+        # Should be in registered list (dry_run), not in ignore
+        assert venv_path in result.get("registered", [])
+        assert venv_path not in result.get("ignore", [])
+
+        # Cleanup
+        unregister_environment(venv_path)
 
     def test_scan_depth_limit(self, temp_dir):
         """Test that scan respects depth limit."""
@@ -371,7 +403,7 @@ class TestDirectoryScanning:
 
         # Should not find the deeply nested venv (at depth 6)
         assert venv_path not in result.get("registered", [])
-        assert venv_path not in result.get("no_kernel", [])
+        assert venv_path not in result.get("ignore", [])
 
         # Scan with higher depth
         result = scan_directory(temp_dir, max_depth=7, dry_run=True)
@@ -535,8 +567,8 @@ class TestKernelspecValidation:
 
         assert _has_kernelspec(venv_path) is False
 
-    def test_cleanup_removes_envs_without_kernelspec(self, temp_dir):
-        """Test that cleanup removes environments that lost their kernelspec."""
+    def test_cleanup_removes_envs_without_kernelspec_when_required(self, temp_dir):
+        """Test that cleanup removes environments that lost their kernelspec when require_kernelspec=True."""
         from nb_venv_kernels.registry import cleanup_registries
 
         # Create venv with ipykernel and register
@@ -553,13 +585,37 @@ class TestKernelspecValidation:
         kernel_dir = os.path.join(venv_path, "share", "jupyter", "kernels")
         shutil.rmtree(kernel_dir)
 
-        # Cleanup should remove it
-        result = cleanup_registries()
+        # Cleanup with require_kernelspec=True should remove it
+        result = cleanup_registries(require_kernelspec=True)
         assert any(item["path"] == venv_path for item in result["removed"])
 
         # Should no longer be in registry
         envs = read_environments()
         assert venv_path not in envs
+
+    def test_cleanup_keeps_envs_without_kernelspec_by_default(self, temp_dir):
+        """Test that cleanup keeps environments without kernelspec when require_kernelspec=False."""
+        from nb_venv_kernels.registry import cleanup_registries
+
+        # Create venv without ipykernel and register
+        venv_path = os.path.join(temp_dir, "no-kernel-cleanup-test")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        register_environment(venv_path)  # No ipykernel, but registers with default
+
+        # Verify registered
+        envs = read_environments()
+        assert venv_path in envs
+
+        # Cleanup with default require_kernelspec=False should NOT remove it
+        result = cleanup_registries()
+        assert not any(item["path"] == venv_path for item in result["removed"])
+
+        # Should still be in registry
+        envs = read_environments()
+        assert venv_path in envs
+
+        # Cleanup
+        unregister_environment(venv_path)
 
 
 class TestScanExclusions:

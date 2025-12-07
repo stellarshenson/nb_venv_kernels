@@ -151,6 +151,13 @@ class VEnvKernelSpecManager(KernelSpecManager):
         help="Default directory depth for 'nb_venv_kernels scan' command."
     )
 
+    require_kernelspec = Bool(
+        False,
+        config=True,
+        help="If True, only register environments with ipykernel installed. "
+             "Environments without kernelspec are ignored during scan."
+    )
+
     def __init__(self, **kwargs):
         super(VEnvKernelSpecManager, self).__init__(**kwargs)
 
@@ -549,8 +556,9 @@ class VEnvKernelSpecManager(KernelSpecManager):
     def scan_environments(self, path=".", max_depth=None, dry_run=False):
         """Scan directory for environments and register them.
 
-        Only environments with a valid kernelspec (ipykernel installed) are registered.
-        Environments without kernelspec are reported with action='no_kernel'.
+        If require_kernelspec config is True, only environments with ipykernel
+        installed are registered. Environments without kernelspec are reported
+        with action='ignore'. If False (default), all valid environments are registered.
 
         Args:
             path: Directory to scan (default: current directory)
@@ -564,7 +572,10 @@ class VEnvKernelSpecManager(KernelSpecManager):
             max_depth = self.scan_depth
 
         path = abspath(path)
-        result = scan_directory(path, max_depth=max_depth, dry_run=dry_run)
+        result = scan_directory(
+            path, max_depth=max_depth, dry_run=dry_run,
+            require_kernelspec=self.require_kernelspec
+        )
 
         # Build lookup of custom names from registry
         registry_envs = _list_environments()
@@ -621,11 +632,19 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 environments.append(get_env_info(env_path, "conda", "keep"))
                 global_conda_count += 1
 
+        # Environments being removed from registry (don't exist or lost kernelspec)
+        removed_paths = set()
+        for item in result["not_available"]:
+            removed_paths.add(item["path"])
+
         # Environments without kernelspec (ipykernel not installed)
-        for env_path in result.get("no_kernel", []):
+        # Exclude paths that are being removed - they show as 'remove', not 'ignore'
+        for env_path in result.get("ignore", []):
+            if env_path in removed_paths:
+                continue  # Will be shown as 'remove' instead
             env_type = "uv" if is_uv_environment(env_path) else "venv"
             environments.append({
-                "action": "no_kernel",
+                "action": "ignore",
                 "name": self._get_env_display_name(env_path, env_type),
                 "type": env_type,
                 "exists": True,
@@ -654,7 +673,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
         environments = self._resolve_name_conflicts(environments, update_action_on_change=True)
 
         # Calculate counts from actual actions (after name conflict resolution)
-        summary = {"add": 0, "update": 0, "keep": 0, "no_kernel": 0, "remove": 0}
+        summary = {"add": 0, "update": 0, "keep": 0, "ignore": 0, "remove": 0}
         for env in environments:
             action = env.get("action", "keep")
             if action in summary:
@@ -678,7 +697,9 @@ class VEnvKernelSpecManager(KernelSpecManager):
         """
         path = abspath(path)
         try:
-            registered, updated = register_environment(path, name=name)
+            registered, updated = register_environment(
+                path, name=name, require_kernelspec=self.require_kernelspec
+            )
             # Invalidate cache
             self._venv_kernels_cache = None
             self._venv_kernels_cache_expiry = None

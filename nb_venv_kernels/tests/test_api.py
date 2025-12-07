@@ -11,6 +11,12 @@ from nb_venv_kernels.manager import VEnvKernelSpecManager
 from nb_venv_kernels.registry import unregister_environment
 
 
+def _install_ipykernel(venv_path):
+    """Helper to install ipykernel in a venv to create kernelspec."""
+    pip_path = os.path.join(venv_path, "bin", "pip")
+    subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
+
+
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory for test environments."""
@@ -37,6 +43,7 @@ class TestListEnvironmentsAPI:
         """Test structure of list_environments entries."""
         venv_path = os.path.join(temp_dir, "api-list-test")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         result = manager.register_environment(venv_path)
         assert result["registered"] is True
@@ -113,6 +120,7 @@ class TestScanEnvironmentsAPI:
         os.makedirs(project_dir)
         venv_path = os.path.join(project_dir, ".venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # Scan without dry_run
         manager.scan_environments(path=temp_dir, max_depth=3, dry_run=False)
@@ -133,6 +141,7 @@ class TestRegisterEnvironmentAPI:
         """Test successful environment registration."""
         venv_path = os.path.join(temp_dir, "api-reg-test")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         result = manager.register_environment(venv_path)
 
@@ -157,6 +166,7 @@ class TestRegisterEnvironmentAPI:
         """Test double registration returns False."""
         venv_path = os.path.join(temp_dir, "double-api-reg")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         result1 = manager.register_environment(venv_path)
         assert result1["registered"] is True
@@ -173,6 +183,7 @@ class TestRegisterEnvironmentAPI:
         """Test registering an environment with a custom name."""
         venv_path = os.path.join(temp_dir, "api-named-reg")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         result = manager.register_environment(venv_path, name="my-api-env")
 
@@ -187,6 +198,7 @@ class TestRegisterEnvironmentAPI:
         """Test updating the custom name of an already registered environment."""
         venv_path = os.path.join(temp_dir, "api-update-name")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # First registration without name
         result1 = manager.register_environment(venv_path)
@@ -215,6 +227,7 @@ class TestUnregisterEnvironmentAPI:
         """Test successful environment unregistration."""
         venv_path = os.path.join(temp_dir, "api-unreg-test")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         manager.register_environment(venv_path)
         result = manager.unregister_environment(venv_path)

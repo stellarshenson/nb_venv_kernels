@@ -621,7 +621,7 @@ def main():
             sys.exit(1)
 
         # Sort environments by action order, then by type order, then by name
-        action_order = {"add": 0, "update": 1, "keep": 2, "no_kernel": 3, "remove": 4}
+        action_order = {"add": 0, "update": 1, "keep": 2, "ignore": 3, "remove": 4}
         type_order = {"conda": 0, "uv": 1, "venv": 2}
 
         def sort_key(env):
@@ -640,7 +640,7 @@ def main():
                 return Colors.cyan(action)
             elif action == "keep":
                 return Colors.blue(action)
-            elif action == "no_kernel":
+            elif action == "ignore":
                 return Colors.orange(action)
             elif action == "remove":
                 return Colors.red(action)
@@ -650,7 +650,7 @@ def main():
         total_add = result["summary"]["add"]
         total_update = result["summary"].get("update", 0)
         total_keep = result["summary"]["keep"]
-        total_no_kernel = result["summary"].get("no_kernel", 0)
+        total_ignore = result["summary"].get("ignore", 0)
         total_remove = result["summary"]["remove"]
 
         if json_output:
@@ -682,7 +682,7 @@ def main():
                     print(f"{action_colored} {env['name']:<30} {env['type']:<16} {exists_str:<8} {kernel_str:<8} {display_path}")
                 print()
 
-            if total_add == 0 and total_update == 0 and total_keep == 0 and total_no_kernel == 0 and total_remove == 0:
+            if total_add == 0 and total_update == 0 and total_keep == 0 and total_ignore == 0 and total_remove == 0:
                 print("No environments found.")
             else:
                 parts = []
@@ -694,8 +694,8 @@ def main():
                         parts.append(f"{total_update} update")
                     if total_keep > 0:
                         parts.append(f"{total_keep} keep")
-                    if total_no_kernel > 0:
-                        parts.append(f"{total_no_kernel} no_kernel")
+                    if total_ignore > 0:
+                        parts.append(f"{total_ignore} ignore")
                     if total_remove > 0:
                         parts.append(f"{total_remove} remove")
                     summary = f"Summary: {', '.join(parts)} (no changes made)"
@@ -706,8 +706,8 @@ def main():
                         parts.append(f"{total_update} updated")
                     if total_keep > 0:
                         parts.append(f"{total_keep} kept")
-                    if total_no_kernel > 0:
-                        parts.append(f"{total_no_kernel} no_kernel (install ipykernel)")
+                    if total_ignore > 0:
+                        parts.append(f"{total_ignore} ignored (install ipykernel)")
                     if total_remove > 0:
                         parts.append(f"{total_remove} removed")
                     summary = f"Summary: {', '.join(parts)}"

@@ -295,20 +295,19 @@ class TestMixedEnvironments:
         for venv_path in venv_paths:
             unregister_environment(venv_path)
 
-    def test_environment_without_ipykernel(self, temp_dir, manager):
-        """Test that environments without ipykernel are not discovered as kernels."""
+    def test_environment_without_ipykernel_registers_by_default(self, temp_dir, manager):
+        """Test that environments without ipykernel can be registered by default."""
         venv_path = os.path.join(temp_dir, "no-kernel-venv")
 
         # Create venv WITHOUT ipykernel
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
 
-        # Register anyway
-        register_environment(venv_path)
+        # Registration should succeed by default (require_kernelspec=False)
+        registered, updated = register_environment(venv_path)
+        assert registered is True
 
-        # Invalidate cache to pick up new registration
+        # Environment is registered but won't show as kernel (no ipykernel)
         invalidate_cache(manager)
-
-        # Should not find kernel (no ipykernel installed)
         specs = manager.find_kernel_specs()
         matching = [k for k in specs.keys() if "no-kernel-venv" in k.lower()]
         assert len(matching) == 0, f"no-kernel-venv should not be in {list(specs.keys())}"

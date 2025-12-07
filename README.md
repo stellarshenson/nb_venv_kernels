@@ -244,6 +244,7 @@ c.VEnvKernelSpecManager.venv_only = True                      # Hide system/cond
 c.VEnvKernelSpecManager.env_filter = r"\.tox|\.nox"           # Exclude by pattern
 c.VEnvKernelSpecManager.name_format = "{language} [{source} env:{environment}]"  # Default format
 c.VEnvKernelSpecManager.scan_depth = 7                        # Default depth for scan command
+c.VEnvKernelSpecManager.require_kernelspec = True             # Only register envs with ipykernel
 ```
 
 **Display name variables**: `{language}`, `{environment}`, `{source}` (uv/venv), `{kernel}`, `{display_name}`
