@@ -18,6 +18,7 @@ from nb_venv_kernels.registry import (
     get_uv_registry_path,
     scan_directory,
     sanitize_registry_names,
+    _has_kernelspec,
 )
 
 
@@ -29,13 +30,20 @@ def temp_dir():
     shutil.rmtree(d, ignore_errors=True)
 
 
+def _install_ipykernel(venv_path):
+    """Helper to install ipykernel in a venv to create kernelspec."""
+    pip_path = os.path.join(venv_path, "bin", "pip")
+    subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
+
+
 class TestEnvironmentRegistration:
     """Tests for environment registration and unregistration."""
 
     def test_register_venv(self, temp_dir):
-        """Test registering a venv environment."""
+        """Test registering a venv environment with kernelspec."""
         venv_path = os.path.join(temp_dir, "reg-test-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         registered, updated = register_environment(venv_path)
         assert registered is True
@@ -52,6 +60,7 @@ class TestEnvironmentRegistration:
         """Test unregistering a venv environment."""
         venv_path = os.path.join(temp_dir, "unreg-test-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         register_environment(venv_path)
         result = unregister_environment(venv_path)
@@ -65,6 +74,7 @@ class TestEnvironmentRegistration:
         """Test unregistering a venv environment that has a custom name."""
         venv_path = os.path.join(temp_dir, "unreg-custom-name-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # Register with custom name
         register_environment(venv_path, name="my-custom-name")
@@ -94,10 +104,20 @@ class TestEnvironmentRegistration:
         with pytest.raises(ValueError):
             register_environment(non_venv)
 
+    def test_register_venv_without_kernelspec(self, temp_dir):
+        """Test that registering a venv without kernelspec raises ValueError."""
+        venv_path = os.path.join(temp_dir, "no-kernel-venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        # No ipykernel installed
+
+        with pytest.raises(ValueError, match="No kernelspec found"):
+            register_environment(venv_path)
+
     def test_double_registration(self, temp_dir):
         """Test registering same environment twice."""
         venv_path = os.path.join(temp_dir, "double-reg-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # First registration
         registered1, updated1 = register_environment(venv_path)
@@ -116,6 +136,7 @@ class TestEnvironmentRegistration:
         """Test registering an environment with a custom name."""
         venv_path = os.path.join(temp_dir, "named-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # Register with custom name
         registered, updated = register_environment(venv_path, name="my-custom-name")
@@ -136,6 +157,7 @@ class TestEnvironmentRegistration:
         """Test updating the custom name of an already registered environment."""
         venv_path = os.path.join(temp_dir, "update-name-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # First registration without name
         registered1, updated1 = register_environment(venv_path)
@@ -218,6 +240,8 @@ class TestUvDetection:
         """Test that uv environments go to uv registry."""
         venv_path = os.path.join(temp_dir, "uv-registry-test")
         subprocess.run(["uv", "venv", venv_path], check=True, capture_output=True)
+        # Install ipykernel using uv
+        subprocess.run(["uv", "pip", "install", "ipykernel", "-q", "-p", venv_path], check=True, capture_output=True)
 
         register_environment(venv_path)
 
@@ -239,6 +263,7 @@ class TestListEnvironments:
         """Test that list_environments returns correct structure."""
         venv_path = os.path.join(temp_dir, "list-test-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
         register_environment(venv_path)
 
         envs = list_environments()
@@ -263,6 +288,7 @@ class TestListEnvironments:
         """Test that exists flag is correctly set."""
         venv_path = os.path.join(temp_dir, "exists-test-venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
         register_environment(venv_path)
 
         envs = list_environments()
@@ -281,18 +307,11 @@ class TestListEnvironments:
 
     def test_list_environments_has_kernel_flag(self, temp_dir):
         """Test that has_kernel flag is correctly set."""
-        # Without ipykernel
-        venv_path = os.path.join(temp_dir, "no-kernel-test")
+        # With ipykernel (required for registration)
+        venv_path = os.path.join(temp_dir, "kernel-test")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
         register_environment(venv_path)
-
-        envs = list_environments()
-        matching = [e for e in envs if e["path"] == venv_path]
-        assert matching[0]["has_kernel"] is False
-
-        # Install ipykernel
-        pip_path = os.path.join(venv_path, "bin", "pip")
-        subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
 
         envs = list_environments()
         matching = [e for e in envs if e["path"] == venv_path]
@@ -305,34 +324,54 @@ class TestListEnvironments:
 class TestDirectoryScanning:
     """Tests for directory scanning."""
 
-    def test_scan_finds_venvs(self, temp_dir):
-        """Test that scan finds venv environments."""
-        # Create nested project with venv
+    def test_scan_finds_venvs_with_kernel(self, temp_dir):
+        """Test that scan finds venv environments with kernelspec."""
+        # Create nested project with venv and ipykernel
         project_dir = os.path.join(temp_dir, "project1")
         os.makedirs(project_dir)
         venv_path = os.path.join(project_dir, ".venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # Scan with dry_run
         result = scan_directory(temp_dir, max_depth=3, dry_run=True)
 
-        # In dry_run mode, new environments go to "registered" list
+        # In dry_run mode, new environments with kernel go to "registered" list
         assert "registered" in result
         assert venv_path in result["registered"]
 
+    def test_scan_reports_venvs_without_kernel(self, temp_dir):
+        """Test that scan reports venvs without kernelspec in no_kernel list."""
+        # Create nested project with venv but NO ipykernel
+        project_dir = os.path.join(temp_dir, "project-no-kernel")
+        os.makedirs(project_dir)
+        venv_path = os.path.join(project_dir, ".venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        # No ipykernel installed
+
+        # Scan
+        result = scan_directory(temp_dir, max_depth=3, dry_run=True)
+
+        # Should be in no_kernel list, not registered
+        assert "no_kernel" in result
+        assert venv_path in result["no_kernel"]
+        assert venv_path not in result.get("registered", [])
+
     def test_scan_depth_limit(self, temp_dir):
         """Test that scan respects depth limit."""
-        # Create deeply nested venv
+        # Create deeply nested venv with ipykernel
         deep_path = os.path.join(temp_dir, "a", "b", "c", "d", "e")
         os.makedirs(deep_path)
         venv_path = os.path.join(deep_path, ".venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # Scan with low depth
         result = scan_directory(temp_dir, max_depth=2, dry_run=True)
 
         # Should not find the deeply nested venv (at depth 6)
         assert venv_path not in result.get("registered", [])
+        assert venv_path not in result.get("no_kernel", [])
 
         # Scan with higher depth
         result = scan_directory(temp_dir, max_depth=7, dry_run=True)
@@ -341,11 +380,12 @@ class TestDirectoryScanning:
         assert venv_path in result["registered"]
 
     def test_scan_registers_environments(self, temp_dir):
-        """Test that scan registers found environments."""
+        """Test that scan registers found environments with kernelspec."""
         project_dir = os.path.join(temp_dir, "scan-reg-project")
         os.makedirs(project_dir)
         venv_path = os.path.join(project_dir, ".venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # Scan without dry_run
         result = scan_directory(temp_dir, max_depth=3, dry_run=False)
@@ -365,6 +405,7 @@ class TestDirectoryScanning:
         os.makedirs(project_dir)
         venv_path = os.path.join(project_dir, ".venv")
         subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
 
         # Get initial state
         initial_envs = read_environments()
@@ -398,13 +439,15 @@ class TestRegistrySanitization:
 
     def test_scan_shows_update_for_sanitized_names(self, temp_dir):
         """Test that scan shows 'update' action when duplicate names are sanitized."""
-        # Create two venvs
+        # Create two venvs with ipykernel
         venv1_path = os.path.join(temp_dir, "proj1", ".venv")
         venv2_path = os.path.join(temp_dir, "proj2", ".venv")
         os.makedirs(os.path.dirname(venv1_path))
         os.makedirs(os.path.dirname(venv2_path))
         subprocess.run(["python", "-m", "venv", venv1_path], check=True, capture_output=True)
         subprocess.run(["python", "-m", "venv", venv2_path], check=True, capture_output=True)
+        _install_ipykernel(venv1_path)
+        _install_ipykernel(venv2_path)
 
         # Register both with the same custom name
         register_environment(venv1_path, name="same-name")
@@ -438,13 +481,15 @@ class TestRegistrySanitization:
 
     def test_sanitize_registry_names_returns_updated(self, temp_dir):
         """Test that sanitize_registry_names returns list of updated entries."""
-        # Create two venvs
+        # Create two venvs with ipykernel
         venv1_path = os.path.join(temp_dir, "proj1", ".venv")
         venv2_path = os.path.join(temp_dir, "proj2", ".venv")
         os.makedirs(os.path.dirname(venv1_path))
         os.makedirs(os.path.dirname(venv2_path))
         subprocess.run(["python", "-m", "venv", venv1_path], check=True, capture_output=True)
         subprocess.run(["python", "-m", "venv", venv2_path], check=True, capture_output=True)
+        _install_ipykernel(venv1_path)
+        _install_ipykernel(venv2_path)
 
         # Register both
         register_environment(venv1_path, name="dup-name")
@@ -471,21 +516,69 @@ class TestRegistrySanitization:
         unregister_environment(venv2_path)
 
 
+class TestKernelspecValidation:
+    """Tests for kernelspec validation in registration and cleanup."""
+
+    def test_has_kernelspec_positive(self, temp_dir):
+        """Test _has_kernelspec returns True for venv with ipykernel."""
+        venv_path = os.path.join(temp_dir, "kernel-venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
+
+        assert _has_kernelspec(venv_path) is True
+
+    def test_has_kernelspec_negative(self, temp_dir):
+        """Test _has_kernelspec returns False for venv without ipykernel."""
+        venv_path = os.path.join(temp_dir, "no-kernel-venv")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        # No ipykernel installed
+
+        assert _has_kernelspec(venv_path) is False
+
+    def test_cleanup_removes_envs_without_kernelspec(self, temp_dir):
+        """Test that cleanup removes environments that lost their kernelspec."""
+        from nb_venv_kernels.registry import cleanup_registries
+
+        # Create venv with ipykernel and register
+        venv_path = os.path.join(temp_dir, "cleanup-kernel-test")
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
+        register_environment(venv_path)
+
+        # Verify registered
+        envs = read_environments()
+        assert venv_path in envs
+
+        # Remove ipykernel (simulate uninstall by deleting kernels dir)
+        kernel_dir = os.path.join(venv_path, "share", "jupyter", "kernels")
+        shutil.rmtree(kernel_dir)
+
+        # Cleanup should remove it
+        result = cleanup_registries()
+        assert any(item["path"] == venv_path for item in result["removed"])
+
+        # Should no longer be in registry
+        envs = read_environments()
+        assert venv_path not in envs
+
+
 class TestScanExclusions:
     """Tests for scan exclusion patterns."""
 
     def test_scan_skips_cache_directories(self, temp_dir):
         """Test that scan skips @cache and uv cache directories."""
-        # Create a fake cache structure with venv inside
+        # Create a fake cache structure with venv inside (with ipykernel)
         cache_dir = os.path.join(temp_dir, "@cache", "uv", "environments-v2")
         os.makedirs(cache_dir)
         cache_venv = os.path.join(cache_dir, "abc123")
         subprocess.run(["python", "-m", "venv", cache_venv], check=True, capture_output=True)
+        _install_ipykernel(cache_venv)
 
-        # Create a normal venv
+        # Create a normal venv (with ipykernel)
         normal_venv = os.path.join(temp_dir, "project", ".venv")
         os.makedirs(os.path.dirname(normal_venv))
         subprocess.run(["python", "-m", "venv", normal_venv], check=True, capture_output=True)
+        _install_ipykernel(normal_venv)
 
         # Scan with dry_run
         result = scan_directory(temp_dir, max_depth=5, dry_run=True)

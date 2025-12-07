@@ -174,3 +174,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 57. **Task - Configurable scan exclusions**: Externalized scan exclusion patterns to JSON config file<br>
     **Result**: Created `scan_config.json` with `skip_directories` and `exclude_path_patterns` arrays. Added `_load_scan_config()`, `_get_skip_directories()`, and `_is_cache_path()` functions. Scan now skips `@cache`, `archive-v0`, `environments-v*` directories. Cleanup removes cache paths from registry. Added `TestScanExclusions` test class with cache directory and path pattern tests
+
+58. **Task - Kernelspec validation for registration**: Added requirement for ipykernel/kernelspec before registration<br>
+    **Result**: Added `_has_kernelspec()` function to check for `share/jupyter/kernels/*/kernel.json`. Modified `register_environment()` to raise ValueError if no kernelspec found. Updated `cleanup_registries()` to remove environments without kernelspec. Added `no_kernel` list to `scan_directory()` return for environments missing ipykernel. CLI scan shows `no_kernel` action in orange with summary hint to install ipykernel. Added `TestKernelspecValidation` test class with 3 tests. Updated all existing tests to install ipykernel where needed. Created checkpoint tag `v1.2.12-checkpoint` before changes

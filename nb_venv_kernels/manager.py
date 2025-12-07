@@ -549,6 +549,9 @@ class VEnvKernelSpecManager(KernelSpecManager):
     def scan_environments(self, path=".", max_depth=None, dry_run=False):
         """Scan directory for environments and register them.
 
+        Only environments with a valid kernelspec (ipykernel installed) are registered.
+        Environments without kernelspec are reported with action='no_kernel'.
+
         Args:
             path: Directory to scan (default: current directory)
             max_depth: Maximum depth to recurse (default: from config)
@@ -618,6 +621,19 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 environments.append(get_env_info(env_path, "conda", "keep"))
                 global_conda_count += 1
 
+        # Environments without kernelspec (ipykernel not installed)
+        for env_path in result.get("no_kernel", []):
+            env_type = "uv" if is_uv_environment(env_path) else "venv"
+            environments.append({
+                "action": "no_kernel",
+                "name": self._get_env_display_name(env_path, env_type),
+                "type": env_type,
+                "exists": True,
+                "has_kernel": False,
+                "path": env_path,
+            })
+            seen_paths.add(env_path)
+
         for item in result["not_available"]:
             custom_name = item.get("custom_name")
             environments.append({
@@ -638,7 +654,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
         environments = self._resolve_name_conflicts(environments, update_action_on_change=True)
 
         # Calculate counts from actual actions (after name conflict resolution)
-        summary = {"add": 0, "update": 0, "keep": 0, "remove": 0}
+        summary = {"add": 0, "update": 0, "keep": 0, "no_kernel": 0, "remove": 0}
         for env in environments:
             action = env.get("action", "keep")
             if action in summary:

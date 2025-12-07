@@ -275,6 +275,15 @@ def _make_unique_name(name: str, existing_names: set) -> str:
     return f"{name}_{suffix}"
 
 
+def _has_kernelspec(env_path: str) -> bool:
+    """Check if environment has a valid Jupyter kernelspec.
+
+    Returns True if env_path/share/jupyter/kernels/*/kernel.json exists.
+    """
+    kernel_path = os.path.join(env_path, "share", "jupyter", "kernels")
+    return _check_has_kernel(kernel_path)
+
+
 def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[bool, bool]:
     """Register an environment path in the appropriate registry.
 
@@ -282,6 +291,9 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
     If already registered, updates the custom name if different.
     If custom name conflicts, appends suffix and warns to stderr.
     Thread/multiprocess safe using file locking.
+
+    Only registers environments that have a valid Jupyter kernelspec installed
+    (ipykernel creates share/jupyter/kernels/*/kernel.json).
 
     Args:
         env_path: Path to the environment directory (e.g., /path/to/.venv)
@@ -292,6 +304,10 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
         - (True, False) if newly registered
         - (False, True) if already registered but name was updated
         - (False, False) if already registered with same name
+
+    Raises:
+        ValueError: If path doesn't exist, not a valid Python environment,
+                   or doesn't have ipykernel installed.
     """
     import sys
 
@@ -305,6 +321,10 @@ def register_environment(env_path: str, name: Optional[str] = None) -> Tuple[boo
     python_path_win = os.path.join(env_path, "Scripts", "python.exe")
     if not os.path.exists(python_path) and not os.path.exists(python_path_win):
         raise ValueError(f"Not a valid Python environment: {env_path}")
+
+    # Check for kernelspec (ipykernel must be installed)
+    if not _has_kernelspec(env_path):
+        raise ValueError(f"No kernelspec found (ipykernel not installed): {env_path}")
 
     # Detect source and use appropriate registry
     source = "uv" if is_uv_environment(env_path) else "venv"
@@ -560,7 +580,12 @@ def _is_cache_path(path: str) -> bool:
 
 
 def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
-    """Remove non-existent and cache environments from both registries.
+    """Remove invalid environments from both registries.
+
+    Removes environments that:
+    - Don't exist on disk
+    - Are cache paths (uv cache directories)
+    - Don't have a valid kernelspec (ipykernel not installed)
 
     Returns:
         Dict with 'removed' list of dicts containing 'path', 'type', and 'custom_name'.
@@ -587,8 +612,10 @@ def cleanup_registries() -> Dict[str, List[Dict[str, str]]]:
             env_path = os.path.abspath(os.path.expanduser(parts[0]))
             custom_name = parts[1] if len(parts) > 1 else None
 
-            # Remove if invalid or is a cache path
-            if is_valid_environment(env_path) and not _is_cache_path(env_path):
+            # Remove if invalid, cache path, or no kernelspec
+            if (is_valid_environment(env_path)
+                    and not _is_cache_path(env_path)
+                    and _has_kernelspec(env_path)):
                 new_lines.append(line)
             else:
                 removed.append({"path": env_path, "type": source, "custom_name": custom_name})
@@ -706,13 +733,16 @@ def scan_directory(root_path: str, max_depth: int = 7,
     environments in appropriate registries and cleans up non-existent ones.
     Also sanitizes duplicate names in registries.
 
+    Only environments with a valid kernelspec (ipykernel installed) are registered.
+    Environments without kernelspec are reported in 'no_kernel' list.
+
     Args:
         root_path: Directory to start scanning from
         max_depth: Maximum depth to recurse (default: 7, None = unlimited)
         dry_run: If True, only report without making changes
 
     Returns:
-        Dict with 'registered', 'updated', 'skipped', 'conda_found', 'not_available' lists.
+        Dict with 'registered', 'updated', 'skipped', 'no_kernel', 'conda_found', 'not_available' lists.
     """
     root_path = os.path.abspath(os.path.expanduser(root_path))
 
@@ -749,6 +779,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
     registered = []
     updated = []
     skipped = []
+    no_kernel = []
     conda_found = []
 
     # Common venv directory names
@@ -787,7 +818,11 @@ def scan_directory(root_path: str, max_depth: int = 7,
                 if is_conda_environment(full_path):
                     conda_found.append(full_path)
                 else:
-                    if dry_run:
+                    # Check if environment has kernelspec (ipykernel installed)
+                    has_kernel = _has_kernelspec(full_path)
+                    if not has_kernel:
+                        no_kernel.append(full_path)
+                    elif dry_run:
                         # In dry run, check if already registered
                         existing = read_environments()
                         if full_path in existing:
@@ -795,7 +830,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
                         else:
                             registered.append(full_path)
                     else:
-                        # Try to register
+                        # Try to register (will succeed since we checked kernelspec)
                         try:
                             was_registered, was_updated = register_environment(full_path)
                             if was_registered:
@@ -805,7 +840,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
                             else:
                                 skipped.append(full_path)
                         except ValueError:
-                            pass  # Not a valid environment
+                            pass  # Should not happen since we pre-checked
                 # Don't recurse into environments
                 continue
 
@@ -827,6 +862,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
         "registered": registered,
         "updated": updated,
         "skipped": skipped,
+        "no_kernel": no_kernel,
         "not_available": not_available,
         "conda_found": conda_found,
     }
