@@ -243,7 +243,7 @@ Optional settings in `jupyter_server_config.py`:
 c.VEnvKernelSpecManager.venv_only = True                      # Hide system/conda kernels
 c.VEnvKernelSpecManager.env_filter = r"\.tox|\.nox"           # Exclude by pattern
 c.VEnvKernelSpecManager.name_format = "{language} [{source} env:{environment}]"  # Default format
-c.VEnvKernelSpecManager.scan_depth = 7                        # Default depth for scan command
+c.VEnvKernelSpecManager.scan_depth = 10                       # Default depth for scan command
 c.VEnvKernelSpecManager.require_kernelspec = True             # Only register envs with ipykernel
 ```
 

@@ -730,7 +730,7 @@ def is_global_conda_environment(path: str) -> bool:
     return False
 
 
-def scan_directory(root_path: str, max_depth: int = 7,
+def scan_directory(root_path: str, max_depth: int = 10,
                    dry_run: bool = False,
                    require_kernelspec: bool = False) -> Dict[str, List]:
     """Scan directory tree for virtual environments.
@@ -741,7 +741,7 @@ def scan_directory(root_path: str, max_depth: int = 7,
 
     Args:
         root_path: Directory to start scanning from
-        max_depth: Maximum depth to recurse (default: 7, None = unlimited)
+        max_depth: Maximum depth to recurse (default: 10, None = unlimited)
         dry_run: If True, only report without making changes
         require_kernelspec: If True, only register environments with ipykernel installed.
                            Environments without kernelspec are reported in 'ignore' list.

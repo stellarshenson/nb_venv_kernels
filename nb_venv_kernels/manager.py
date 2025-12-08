@@ -146,7 +146,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
     )
 
     scan_depth = Integer(
-        7,
+        10,
         config=True,
         help="Default directory depth for 'nb_venv_kernels scan' command."
     )
