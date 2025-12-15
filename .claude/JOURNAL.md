@@ -186,3 +186,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 61. **Task - Update default scan_depth**: Changed default scan depth from 7 to 10<br>
     **Result**: Updated `scan_depth` default in `VEnvKernelSpecManager` and `scan_directory()` from 7 to 10 for deeper directory traversal. Updated README configuration example
+
+62. **Task - Persistent name cache for scanner**: Implemented name cache that remembers path-to-name mappings across sessions<br>
+    **Result**: Added name cache stored at `~/.local/share/nb_venv_kernels/name_cache.json`. Cache functions in registry.py: `get_name_cache_path()`, `load_name_cache()`, `save_name_cache()`, `get_cached_name()`, `update_name_cache()`. Added `_derive_env_name()` helper to derive default name from path (uses parent directory). Modified `register_environment()` to update cache on every registration - stores either custom name or derived name. Modified `scan_directory()` to look up cached names before registration - environments get their previous names restored automatically after unregister/re-scan cycle. Unregistration deliberately does NOT remove cache entries - cache persists until manual deletion. Added `TestNameCache` test class with 11 tests covering cache operations, registration integration, and scan-with-cache behavior. 44 registry tests passing

@@ -19,6 +19,12 @@ from nb_venv_kernels.registry import (
     scan_directory,
     sanitize_registry_names,
     _has_kernelspec,
+    get_name_cache_path,
+    load_name_cache,
+    save_name_cache,
+    get_cached_name,
+    update_name_cache,
+    _derive_env_name,
 )
 
 
@@ -651,3 +657,155 @@ class TestScanExclusions:
         assert _is_cache_path("/home/user/@cache/uv/environments-v2/abc") is True
         assert _is_cache_path("/home/user/.local/share/uv/cache") is True
         assert _is_cache_path("/home/user/project/.venv") is False
+
+
+class TestNameCache:
+    """Tests for the name cache functionality."""
+
+    @pytest.fixture(autouse=True)
+    def clean_cache(self):
+        """Clean up name cache before and after each test."""
+        cache_path = get_name_cache_path()
+        if cache_path.exists():
+            cache_path.unlink()
+        yield
+        if cache_path.exists():
+            cache_path.unlink()
+
+    def test_name_cache_path(self):
+        """Test that name cache path is in correct location."""
+        path = get_name_cache_path()
+        assert ".local" in str(path)
+        assert "share" in str(path)
+        assert "nb_venv_kernels" in str(path)
+        assert "name_cache.json" in str(path)
+
+    def test_load_empty_cache(self):
+        """Test loading when cache file doesn't exist."""
+        cache = load_name_cache()
+        assert cache == {}
+
+    def test_save_and_load_cache(self):
+        """Test saving and loading cache data."""
+        test_data = {"/path/to/env1": "custom-name-1", "/path/to/env2": "custom-name-2"}
+        save_name_cache(test_data)
+
+        loaded = load_name_cache()
+        assert loaded == test_data
+
+    def test_update_name_cache(self):
+        """Test updating individual cache entries."""
+        update_name_cache("/path/to/env", "my-name")
+        assert get_cached_name("/path/to/env") == "my-name"
+
+        # Update with new name
+        update_name_cache("/path/to/env", "new-name")
+        assert get_cached_name("/path/to/env") == "new-name"
+
+    def test_get_cached_name_not_found(self):
+        """Test getting name for non-cached path."""
+        result = get_cached_name("/nonexistent/path")
+        assert result is None
+
+    def test_derive_env_name(self):
+        """Test deriving default name from path."""
+        assert _derive_env_name("/home/user/projects/myproject/.venv") == "myproject"
+        assert _derive_env_name("/home/user/myapp/venv") == "myapp"
+
+    def test_register_updates_cache_with_custom_name(self, temp_dir):
+        """Test that registration with custom name updates the cache."""
+        venv_path = os.path.join(temp_dir, "cache-test-project", ".venv")
+        os.makedirs(os.path.dirname(venv_path))
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
+
+        register_environment(venv_path, name="my-custom-kernel")
+
+        # Verify cache was updated
+        cached = get_cached_name(venv_path)
+        assert cached == "my-custom-kernel"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_register_updates_cache_with_derived_name(self, temp_dir):
+        """Test that registration without custom name updates cache with derived name."""
+        project_name = "derived-name-project"
+        venv_path = os.path.join(temp_dir, project_name, ".venv")
+        os.makedirs(os.path.dirname(venv_path))
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
+
+        register_environment(venv_path)  # No custom name
+
+        # Verify cache was updated with derived name
+        cached = get_cached_name(venv_path)
+        assert cached == project_name
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_unregister_does_not_remove_cache(self, temp_dir):
+        """Test that unregistration does NOT remove the cache entry."""
+        venv_path = os.path.join(temp_dir, "unregister-cache-test", ".venv")
+        os.makedirs(os.path.dirname(venv_path))
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
+
+        # Register with custom name
+        register_environment(venv_path, name="persistent-name")
+        assert get_cached_name(venv_path) == "persistent-name"
+
+        # Unregister
+        unregister_environment(venv_path)
+
+        # Cache should still have the entry
+        assert get_cached_name(venv_path) == "persistent-name"
+
+    def test_scan_uses_cached_name_for_previously_registered(self, temp_dir):
+        """Test that scan uses cached name when re-registering environment."""
+        venv_path = os.path.join(temp_dir, "scan-cache-test", ".venv")
+        os.makedirs(os.path.dirname(venv_path))
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
+
+        # Register with custom name
+        register_environment(venv_path, name="remembered-name")
+        assert get_cached_name(venv_path) == "remembered-name"
+
+        # Unregister (cache persists)
+        unregister_environment(venv_path)
+        assert venv_path not in read_environments()
+
+        # Scan should re-register with the cached name
+        scan_directory(temp_dir, max_depth=3)
+
+        # Verify it's registered with the cached name
+        envs = read_environments_with_names()
+        env_dict = {path: name for path, name in envs}
+        assert venv_path in env_dict
+        assert env_dict[venv_path] == "remembered-name"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_register_overwrites_cache_with_new_name(self, temp_dir):
+        """Test that re-registration with a new name overwrites the cache."""
+        venv_path = os.path.join(temp_dir, "overwrite-cache-test", ".venv")
+        os.makedirs(os.path.dirname(venv_path))
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
+
+        # Register with first name
+        register_environment(venv_path, name="first-name")
+        assert get_cached_name(venv_path) == "first-name"
+
+        # Re-register with new name (update)
+        registered, updated = register_environment(venv_path, name="second-name")
+        assert updated is True
+
+        # Cache should have the new name
+        assert get_cached_name(venv_path) == "second-name"
+
+        # Cleanup
+        unregister_environment(venv_path)

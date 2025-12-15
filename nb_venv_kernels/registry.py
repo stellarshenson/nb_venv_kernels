@@ -4,6 +4,9 @@
 Manages two registry files:
 - ~/.venv/environments.txt for venv environments
 - ~/.uv/environments.txt for uv environments
+
+Also manages a name cache for persistent path-to-name mappings:
+- ~/.local/share/nb_venv_kernels/name_cache.json
 """
 import json
 import os
@@ -18,6 +21,89 @@ from filelock import FileLock
 def _get_registry_lock_path() -> Path:
     """Return path to the global registry lock file."""
     return Path.home() / ".venv" / "registry.lock"
+
+
+# =============================================================================
+# Name Cache Functions
+# =============================================================================
+
+def get_name_cache_path() -> Path:
+    """Return path to the name cache file."""
+    return Path.home() / ".local" / "share" / "nb_venv_kernels" / "name_cache.json"
+
+
+def _get_name_cache_lock_path() -> Path:
+    """Return path to the name cache lock file."""
+    return Path.home() / ".local" / "share" / "nb_venv_kernels" / "name_cache.lock"
+
+
+@contextmanager
+def _name_cache_lock():
+    """Context manager for name cache file locking."""
+    lock_path = _get_name_cache_lock_path()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock = FileLock(str(lock_path))
+    with lock:
+        yield
+
+
+def load_name_cache() -> Dict[str, str]:
+    """Load the name cache from disk.
+
+    Returns:
+        Dict mapping absolute paths to their cached names.
+    """
+    cache_path = get_name_cache_path()
+    if not cache_path.exists():
+        return {}
+
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def save_name_cache(cache: Dict[str, str]) -> None:
+    """Save the name cache to disk.
+
+    Args:
+        cache: Dict mapping absolute paths to names.
+    """
+    cache_path = get_name_cache_path()
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump(cache, f, indent=2)
+
+
+def get_cached_name(env_path: str) -> Optional[str]:
+    """Look up a cached name for an environment path.
+
+    Args:
+        env_path: Path to the environment.
+
+    Returns:
+        Cached name if found, None otherwise.
+    """
+    env_path = os.path.abspath(os.path.expanduser(env_path))
+    with _name_cache_lock():
+        cache = load_name_cache()
+        return cache.get(env_path)
+
+
+def update_name_cache(env_path: str, name: str) -> None:
+    """Update or add a path-to-name mapping in the cache.
+
+    Args:
+        env_path: Absolute path to the environment.
+        name: Name to cache for this path.
+    """
+    env_path = os.path.abspath(os.path.expanduser(env_path))
+    with _name_cache_lock():
+        cache = load_name_cache()
+        cache[env_path] = name
+        save_name_cache(cache)
 
 
 @contextmanager
@@ -275,6 +361,23 @@ def _make_unique_name(name: str, existing_names: set) -> str:
     return f"{name}_{suffix}"
 
 
+def _derive_env_name(env_path: str) -> str:
+    """Derive a default name from an environment path.
+
+    Uses the parent directory name (project folder) as the default name.
+    For paths like /home/user/projects/myproject/.venv -> "myproject"
+
+    Args:
+        env_path: Absolute path to the environment.
+
+    Returns:
+        Derived name string.
+    """
+    env_path = os.path.abspath(env_path)
+    parent = os.path.dirname(env_path)
+    return os.path.basename(parent)
+
+
 def _has_kernelspec(env_path: str) -> bool:
     """Check if environment has a valid Jupyter kernelspec.
 
@@ -368,6 +471,9 @@ def register_environment(env_path: str, name: Optional[str] = None,
 
                     with open(check_registry, "w", encoding="utf-8") as f:
                         f.writelines(lines)
+
+                    # Update name cache
+                    update_name_cache(env_path, unique_name)
                     return (False, True)  # Updated name
 
         # Not registered - add new entry
@@ -386,6 +492,10 @@ def register_environment(env_path: str, name: Optional[str] = None,
                 f.write(f"{env_path}\t{final_name}\n")
             else:
                 f.write(env_path + "\n")
+
+        # Update name cache - use final_name or derive from path
+        cache_name = final_name if final_name else _derive_env_name(env_path)
+        update_name_cache(env_path, cache_name)
 
         return (True, False)  # Newly registered
 
@@ -837,10 +947,12 @@ def scan_directory(root_path: str, max_depth: int = 10,
                         else:
                             registered.append(full_path)
                     else:
-                        # Try to register
+                        # Try to register - use cached name if available
+                        cached_name = get_cached_name(full_path)
                         try:
                             was_registered, was_updated = register_environment(
-                                full_path, require_kernelspec=require_kernelspec
+                                full_path, name=cached_name,
+                                require_kernelspec=require_kernelspec
                             )
                             if was_registered:
                                 registered.append(full_path)
