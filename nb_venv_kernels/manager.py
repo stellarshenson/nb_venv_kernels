@@ -577,11 +577,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
             require_kernelspec=self.require_kernelspec
         )
 
-        # Build lookup of custom names from registry
-        registry_envs = _list_environments()
-        custom_names = {env["path"]: env.get("custom_name") for env in registry_envs}
-
-        def get_env_info(env_path, env_type, action, exists=None, custom_name=None):
+        def get_env_info(env_path, env_type, action, env_name, exists=None):
             """Build environment info dict with exists and has_kernel."""
             # Trust exists parameter if provided (environment was just found)
             if exists is None:
@@ -590,7 +586,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
             has_kernel = _check_has_kernel(kernel_path) if exists else False
             return {
                 "action": action,
-                "name": self._get_env_display_name(env_path, env_type, custom_name),
+                "name": env_name,
                 "type": env_type,
                 "exists": exists,
                 "has_kernel": has_kernel,
@@ -602,34 +598,41 @@ class VEnvKernelSpecManager(KernelSpecManager):
         seen_paths = set()
 
         # Environments found during scan - they exist (we just found them)
-        for env_path in result["registered"]:
+        # result["registered"] is list of {"path": ..., "name": ...} dicts
+        for item in result["registered"]:
+            env_path = item["path"]
+            env_name = item["name"]
             env_type = "uv" if is_uv_environment(env_path) else "venv"
-            environments.append(get_env_info(env_path, env_type, "add", exists=True))
+            environments.append(get_env_info(env_path, env_type, "add", env_name, exists=True))
             seen_paths.add(env_path)
 
         # Environments that were actually updated (name changed)
-        for env_path in result.get("updated", []):
+        for item in result.get("updated", []):
+            env_path = item["path"]
+            env_name = item["name"]
             env_type = "uv" if is_uv_environment(env_path) else "venv"
-            custom_name = custom_names.get(env_path)
-            environments.append(get_env_info(env_path, env_type, "update", exists=True, custom_name=custom_name))
+            environments.append(get_env_info(env_path, env_type, "update", env_name, exists=True))
             seen_paths.add(env_path)
 
         # Environments already registered (no change)
-        for env_path in result["skipped"]:
+        for item in result["skipped"]:
+            env_path = item["path"]
+            env_name = item["name"]
             env_type = "uv" if is_uv_environment(env_path) else "venv"
-            custom_name = custom_names.get(env_path)
-            environments.append(get_env_info(env_path, env_type, "keep", exists=True, custom_name=custom_name))
+            environments.append(get_env_info(env_path, env_type, "keep", env_name, exists=True))
             seen_paths.add(env_path)
 
         for env_path in result["conda_found"]:
-            environments.append(get_env_info(env_path, "conda", "keep", exists=True))
+            env_name = os.path.basename(env_path)
+            environments.append(get_env_info(env_path, "conda", "keep", env_name, exists=True))
             seen_paths.add(env_path)
 
         # Add global conda environments not in scan path
         global_conda_count = 0
         for env_path in get_conda_environments():
             if env_path not in seen_paths:
-                environments.append(get_env_info(env_path, "conda", "keep"))
+                env_name = os.path.basename(env_path)
+                environments.append(get_env_info(env_path, "conda", "keep", env_name))
                 global_conda_count += 1
 
         # Environments being removed from registry (don't exist or lost kernelspec)
@@ -639,13 +642,16 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
         # Environments without kernelspec (ipykernel not installed)
         # Exclude paths that are being removed - they show as 'remove', not 'ignore'
-        for env_path in result.get("ignore", []):
+        # result["ignore"] is list of {"path": ..., "name": ...} dicts
+        for item in result.get("ignore", []):
+            env_path = item["path"]
+            env_name = item["name"]
             if env_path in removed_paths:
                 continue  # Will be shown as 'remove' instead
             env_type = "uv" if is_uv_environment(env_path) else "venv"
             environments.append({
                 "action": "ignore",
-                "name": self._get_env_display_name(env_path, env_type),
+                "name": env_name,
                 "type": env_type,
                 "exists": True,
                 "has_kernel": False,
@@ -655,9 +661,10 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
         for item in result["not_available"]:
             custom_name = item.get("custom_name")
+            env_name = custom_name or self._get_env_display_name(item["path"], item["type"])
             environments.append({
                 "action": "remove",
-                "name": self._get_env_display_name(item["path"], item["type"], custom_name),
+                "name": env_name,
                 "type": item["type"],
                 "exists": False,
                 "has_kernel": False,

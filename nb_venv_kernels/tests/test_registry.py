@@ -42,6 +42,11 @@ def _install_ipykernel(venv_path):
     subprocess.run([pip_path, "install", "ipykernel", "-q"], check=True, capture_output=True)
 
 
+def _path_in_result(path, result_list):
+    """Check if a path is in a list of dicts with 'path' key."""
+    return any(item["path"] == path for item in result_list)
+
+
 class TestEnvironmentRegistration:
     """Tests for environment registration and unregistration."""
 
@@ -357,7 +362,7 @@ class TestDirectoryScanning:
 
         # In dry_run mode, new environments with kernel go to "registered" list
         assert "registered" in result
-        assert venv_path in result["registered"]
+        assert _path_in_result(venv_path, result["registered"])
 
     def test_scan_reports_venvs_without_kernel_when_required(self, temp_dir):
         """Test that scan reports venvs without kernelspec in ignore list when require_kernelspec=True."""
@@ -373,8 +378,8 @@ class TestDirectoryScanning:
 
         # Should be in ignore list, not registered
         assert "ignore" in result
-        assert venv_path in result["ignore"]
-        assert venv_path not in result.get("registered", [])
+        assert _path_in_result(venv_path, result["ignore"])
+        assert not _path_in_result(venv_path, result.get("registered", []))
 
     def test_scan_registers_venvs_without_kernel_by_default(self, temp_dir):
         """Test that scan registers venvs without kernelspec when require_kernelspec=False (default)."""
@@ -389,8 +394,8 @@ class TestDirectoryScanning:
         result = scan_directory(temp_dir, max_depth=3, dry_run=True)
 
         # Should be in registered list (dry_run), not in ignore
-        assert venv_path in result.get("registered", [])
-        assert venv_path not in result.get("ignore", [])
+        assert _path_in_result(venv_path, result.get("registered", []))
+        assert not _path_in_result(venv_path, result.get("ignore", []))
 
         # Cleanup
         unregister_environment(venv_path)
@@ -408,14 +413,14 @@ class TestDirectoryScanning:
         result = scan_directory(temp_dir, max_depth=2, dry_run=True)
 
         # Should not find the deeply nested venv (at depth 6)
-        assert venv_path not in result.get("registered", [])
-        assert venv_path not in result.get("ignore", [])
+        assert not _path_in_result(venv_path, result.get("registered", []))
+        assert not _path_in_result(venv_path, result.get("ignore", []))
 
         # Scan with higher depth
         result = scan_directory(temp_dir, max_depth=7, dry_run=True)
 
         # Should find it now
-        assert venv_path in result["registered"]
+        assert _path_in_result(venv_path, result["registered"])
 
     def test_scan_registers_environments(self, temp_dir):
         """Test that scan registers found environments with kernelspec."""
@@ -428,7 +433,7 @@ class TestDirectoryScanning:
         # Scan without dry_run
         result = scan_directory(temp_dir, max_depth=3, dry_run=False)
 
-        assert venv_path in result["registered"]
+        assert _path_in_result(venv_path, result["registered"])
 
         # Should now be in registry
         envs = read_environments()
@@ -506,7 +511,7 @@ class TestRegistrySanitization:
 
         # One of the paths should be in updated list due to name sanitization
         assert len(result["updated"]) >= 1
-        assert venv1_path in result["updated"] or venv2_path in result["updated"]
+        assert _path_in_result(venv1_path, result["updated"]) or _path_in_result(venv2_path, result["updated"])
 
         # Verify registry now has unique names
         envs = read_environments_with_names()
@@ -646,8 +651,8 @@ class TestScanExclusions:
         result = scan_directory(temp_dir, max_depth=5, dry_run=True)
 
         # Should find normal venv but not cache venv
-        assert normal_venv in result["registered"]
-        assert cache_venv not in result["registered"]
+        assert _path_in_result(normal_venv, result["registered"])
+        assert not _path_in_result(cache_venv, result["registered"])
 
     def test_cleanup_removes_cache_paths(self, temp_dir):
         """Test that cleanup removes cache paths from registry."""

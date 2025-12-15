@@ -858,7 +858,13 @@ def scan_directory(root_path: str, max_depth: int = 10,
                            If False (default), all valid environments are registered.
 
     Returns:
-        Dict with 'registered', 'updated', 'skipped', 'ignore', 'conda_found', 'not_available' lists.
+        Dict with lists of dicts containing 'path' and 'name' keys:
+        - 'registered': newly registered environments
+        - 'updated': environments with updated names
+        - 'skipped': already registered environments
+        - 'ignore': environments without kernelspec (when require_kernelspec=True)
+        - 'conda_found': conda environments found (paths only)
+        - 'not_available': removed environments (dicts with 'path', 'type', 'custom_name')
     """
     root_path = os.path.abspath(os.path.expanduser(root_path))
 
@@ -938,14 +944,17 @@ def scan_directory(root_path: str, max_depth: int = 10,
                     has_kernel = _has_kernelspec(full_path)
                     if require_kernelspec and not has_kernel:
                         # Only ignore if require_kernelspec is True
-                        ignore.append(full_path)
+                        env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                        ignore.append({"path": full_path, "name": env_name})
                     elif dry_run:
                         # In dry run, check if already registered
-                        existing = read_environments()
-                        if full_path in existing:
-                            skipped.append(full_path)
+                        existing = read_environments_with_names()
+                        existing_dict = {p: n for p, n in existing}
+                        if full_path in existing_dict:
+                            skipped.append({"path": full_path, "name": existing_dict[full_path] or _derive_env_name(full_path)})
                         else:
-                            registered.append(full_path)
+                            env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                            registered.append({"path": full_path, "name": env_name})
                     else:
                         # Try to register - use cached name if available
                         cached_name = get_cached_name(full_path)
@@ -954,15 +963,18 @@ def scan_directory(root_path: str, max_depth: int = 10,
                                 full_path, name=cached_name,
                                 require_kernelspec=require_kernelspec
                             )
+                            # Get the final name from cache (updated by register_environment)
+                            final_name = get_cached_name(full_path) or _derive_env_name(full_path)
                             if was_registered:
-                                registered.append(full_path)
+                                registered.append({"path": full_path, "name": final_name})
                             elif was_updated:
-                                updated.append(full_path)
+                                updated.append({"path": full_path, "name": final_name})
                             else:
-                                skipped.append(full_path)
+                                skipped.append({"path": full_path, "name": final_name})
                         except ValueError:
                             # Only happens if require_kernelspec=True and no kernel
-                            ignore.append(full_path)
+                            env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                            ignore.append({"path": full_path, "name": env_name})
                 # Don't recurse into environments
                 continue
 
@@ -973,12 +985,16 @@ def scan_directory(root_path: str, max_depth: int = 10,
 
     # Add sanitized entries to updated list (name was changed due to duplicate)
     # and remove them from skipped if they were there
+    updated_paths = {e["path"] for e in updated}
+    skipped_paths = {e["path"] for e in skipped}
     for entry in sanitized:
         path = entry["path"]
-        if path not in updated:
-            updated.append(path)
-        if path in skipped:
-            skipped.remove(path)
+        new_name = entry["new_name"]
+        if path not in updated_paths:
+            updated.append({"path": path, "name": new_name})
+            updated_paths.add(path)
+        if path in skipped_paths:
+            skipped[:] = [e for e in skipped if e["path"] != path]
 
     return {
         "registered": registered,
