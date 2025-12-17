@@ -142,6 +142,17 @@ Registry format is plain text with optional tab-separated custom names:
 
 The `register` command auto-detects uv environments via `pyvenv.cfg` and writes to the appropriate registry.
 
+## JupyterLab Commands
+
+The extension adds commands to JupyterLab accessible via Kernel menu or Command Palette (Ctrl+Shift+C):
+
+| Command | Command ID | Description |
+|---------|------------|-------------|
+| **Scan for Virtual Environments** | `nb_venv_kernels:scan` | Scans workspace for venv/uv/conda environments and registers them. Results displayed in modal with action indicators |
+| **Refresh Kernel List** | `nb_venv_kernels:refresh` | Immediately refreshes the kernel selector. Use after CLI register/unregister operations |
+
+The kernel list is cached for 60 seconds (same as nb_conda_kernels). Use "Refresh Kernel List" for immediate updates after CLI changes.
+
 ## How It Works
 
 Environment registration and kernel discovery flow:
@@ -248,17 +259,6 @@ c.VEnvKernelSpecManager.require_kernelspec = True             # Only register en
 ```
 
 **Display name variables**: `{language}`, `{environment}`, `{source}` (uv/venv), `{kernel}`, `{display_name}`
-
-## JupyterLab Commands
-
-The extension adds commands to JupyterLab accessible via Kernel menu or Command Palette (Ctrl+Shift+C):
-
-| Command | Command ID | Description |
-|---------|------------|-------------|
-| **Scan for Virtual Environments** | `nb_venv_kernels:scan` | Scans workspace for venv/uv/conda environments and registers them. Results displayed in modal with action indicators |
-| **Refresh Kernel List** | `nb_venv_kernels:refresh` | Immediately refreshes the kernel selector. Use after CLI register/unregister operations |
-
-The kernel list is cached for 60 seconds (same as nb_conda_kernels). Use "Refresh Kernel List" for immediate updates after CLI changes.
 
 ## Programmatic API
 
