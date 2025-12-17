@@ -42,14 +42,14 @@ test('should have scan command in command palette', async ({ page }) => {
   await page.waitForSelector('.lm-CommandPalette');
 
   // Type to search for the scan command
-  await page.keyboard.type('Scan for Python');
+  await page.keyboard.type('Scan for Virtual');
 
   // Wait for search results
   await page.waitForTimeout(500);
 
   // Check that scan command appears in results
   const scanItem = page.locator('.lm-CommandPalette-item', {
-    hasText: 'Scan for Python Environments'
+    hasText: 'Scan for Virtual Environments'
   });
 
   await expect(scanItem).toBeVisible();
