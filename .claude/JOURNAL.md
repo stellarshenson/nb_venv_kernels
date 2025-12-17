@@ -201,3 +201,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 66. **Task - Backend cache invalidation for refresh** (v1.2.19): Enhanced Refresh command to invalidate backend cache<br>
     **Result**: Added `/nb-venv-kernels/refresh` POST endpoint in routes.py that invalidates `_venv_kernels_cache` and `_venv_kernels_cache_expiry`. Updated frontend `executeRefreshCommand()` to call this endpoint before `refreshSpecs()` via new `invalidateServerCache()` function. This ensures "Refresh Kernel List" command shows current registry state immediately, bypassing the 60-second backend cache. Added JupyterLab Commands section to README documenting Scan and Refresh commands. 85 tests passing
+
+67. **Task - Scan command cache invalidation** (v1.2.20): Enhanced Scan command to invalidate backend cache and renamed label<br>
+    **Result**: Added `invalidateServerCache()` call before `refreshSpecs()` in `executeScanCommand()` for consistent cache behavior. Renamed menu label from "Scan for Python Environments" to "Scan for Virtual Environments". Updated README to match

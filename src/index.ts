@@ -322,7 +322,8 @@ async function executeScanCommand(): Promise<void> {
     loadingDialog.dispose();
     await showScanResults(result);
 
-    // Refresh kernel specs so new kernels appear immediately in kernel picker
+    // Invalidate backend cache and refresh kernel specs
+    await invalidateServerCache();
     if (kernelSpecManager) {
       await kernelSpecManager.refreshSpecs();
     }
@@ -358,7 +359,7 @@ const plugin: JupyterFrontEndPlugin<void> = {
 
     // Register scan command
     app.commands.addCommand(SCAN_COMMAND, {
-      label: 'Scan for Python Environments',
+      label: 'Scan for Virtual Environments',
       caption: 'Scan workspace for venv/uv/conda environments',
       execute: executeScanCommand
     });

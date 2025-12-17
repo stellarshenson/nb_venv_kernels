@@ -255,7 +255,7 @@ The extension adds commands to JupyterLab accessible via Kernel menu or Command 
 
 | Command | Description |
 |---------|-------------|
-| **Scan for Python Environments** | Scans workspace for venv/uv/conda environments and registers them. Results displayed in modal with action indicators |
+| **Scan for Virtual Environments** | Scans workspace for venv/uv/conda environments and registers them. Results displayed in modal with action indicators |
 | **Refresh Kernel List** | Immediately refreshes the kernel selector. Use after CLI register/unregister operations |
 
 The kernel list is cached for 60 seconds (same as nb_conda_kernels). Use "Refresh Kernel List" for immediate updates after CLI changes.
