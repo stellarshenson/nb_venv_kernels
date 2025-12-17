@@ -249,11 +249,22 @@ c.VEnvKernelSpecManager.require_kernelspec = True             # Only register en
 
 **Display name variables**: `{language}`, `{environment}`, `{source}` (uv/venv), `{kernel}`, `{display_name}`
 
+## JupyterLab Commands
+
+The extension adds commands to JupyterLab accessible via Kernel menu or Command Palette (Ctrl+Shift+C):
+
+| Command | Description |
+|---------|-------------|
+| **Scan for Python Environments** | Scans workspace for venv/uv/conda environments and registers them. Results displayed in modal with action indicators |
+| **Refresh Kernel List** | Immediately refreshes the kernel selector. Use after CLI register/unregister operations |
+
+The kernel list is cached for 60 seconds (same as nb_conda_kernels). Use "Refresh Kernel List" for immediate updates after CLI changes.
+
 ## Programmatic API
 
 The extension provides REST and Python APIs for integration with tools and automation. See [API Documentation](doc/API.md) for details on:
 
-- **REST endpoints** - /nb-venv-kernels/environments, /scan, /register, /unregister
+- **REST endpoints** - /nb-venv-kernels/environments, /scan, /register, /unregister, /refresh
 - **Python API** - VEnvKernelSpecManager methods for listing, scanning, and registering environments
 - **JSON output** - CLI commands support `--json` flag for machine-to-machine communication
 

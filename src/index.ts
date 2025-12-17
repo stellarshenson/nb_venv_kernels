@@ -276,9 +276,35 @@ const SCAN_COMMAND = 'nb_venv_kernels:scan';
 const REFRESH_COMMAND = 'nb_venv_kernels:refresh';
 
 /**
+ * Invalidate server-side kernel spec cache
+ */
+async function invalidateServerCache(): Promise<void> {
+  const settings = ServerConnection.makeSettings();
+  const requestUrl = URLExt.join(
+    settings.baseUrl,
+    'nb-venv-kernels',
+    'refresh'
+  );
+
+  try {
+    await ServerConnection.makeRequest(
+      requestUrl,
+      { method: 'POST' },
+      settings
+    );
+  } catch (error) {
+    console.warn('Failed to invalidate server cache:', error);
+  }
+}
+
+/**
  * Execute the refresh command - refreshes kernel specs immediately
  */
 async function executeRefreshCommand(): Promise<void> {
+  // First invalidate server cache so it rebuilds from registries
+  await invalidateServerCache();
+
+  // Then refresh frontend kernel specs
   if (kernelSpecManager) {
     await kernelSpecManager.refreshSpecs();
     console.log('Kernel specs refreshed');

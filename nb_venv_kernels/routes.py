@@ -133,6 +133,18 @@ class UnregisterEnvironmentHandler(APIHandler):
         self.finish(json.dumps(result))
 
 
+class RefreshHandler(APIHandler):
+    """Invalidate kernel spec cache for immediate refresh."""
+
+    @tornado.web.authenticated
+    def post(self):
+        manager = get_venv_manager(self)
+        # Invalidate the cache so next request rebuilds kernel list
+        manager._venv_kernels_cache = None
+        manager._venv_kernels_cache_expiry = None
+        self.finish(json.dumps({"refreshed": True}))
+
+
 def setup_route_handlers(web_app):
     host_pattern = ".*$"
     base_url = web_app.settings["base_url"]
@@ -142,6 +154,7 @@ def setup_route_handlers(web_app):
         (url_path_join(base_url, "nb-venv-kernels", "scan"), ScanEnvironmentsHandler),
         (url_path_join(base_url, "nb-venv-kernels", "register"), RegisterEnvironmentHandler),
         (url_path_join(base_url, "nb-venv-kernels", "unregister"), UnregisterEnvironmentHandler),
+        (url_path_join(base_url, "nb-venv-kernels", "refresh"), RefreshHandler),
     ]
 
     web_app.add_handlers(host_pattern, handlers)

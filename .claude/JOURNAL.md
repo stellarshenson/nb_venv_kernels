@@ -198,3 +198,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 65. **Task - Add Refresh Kernel List command** (v1.2.18): Added JupyterLab command for immediate kernel list refresh<br>
     **Result**: Added `REFRESH_COMMAND` constant and `executeRefreshCommand()` function in index.ts that calls `kernelSpecManager.refreshSpecs()`. Registered command with label "Refresh Kernel List" and caption "Refresh available kernels (use after CLI changes)". Added to Kernel menu and command palette under "Kernel" category. This enables users to immediately see kernel changes made via CLI (unregister, environment deletion) without waiting for the 60-second cache timeout or running a full scan. 85 tests passing
+
+66. **Task - Backend cache invalidation for refresh** (v1.2.19): Enhanced Refresh command to invalidate backend cache<br>
+    **Result**: Added `/nb-venv-kernels/refresh` POST endpoint in routes.py that invalidates `_venv_kernels_cache` and `_venv_kernels_cache_expiry`. Updated frontend `executeRefreshCommand()` to call this endpoint before `refreshSpecs()` via new `invalidateServerCache()` function. This ensures "Refresh Kernel List" command shows current registry state immediately, bypassing the 60-second backend cache. Added JupyterLab Commands section to README documenting Scan and Refresh commands. 85 tests passing
