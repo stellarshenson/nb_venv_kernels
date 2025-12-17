@@ -271,6 +271,21 @@ async function showScanResults(result: IScanResult): Promise<void> {
 const SCAN_COMMAND = 'nb_venv_kernels:scan';
 
 /**
+ * Command ID for refreshing kernel specs
+ */
+const REFRESH_COMMAND = 'nb_venv_kernels:refresh';
+
+/**
+ * Execute the refresh command - refreshes kernel specs immediately
+ */
+async function executeRefreshCommand(): Promise<void> {
+  if (kernelSpecManager) {
+    await kernelSpecManager.refreshSpecs();
+    console.log('Kernel specs refreshed');
+  }
+}
+
+/**
  * Execute the scan command - scans workspace for Python environments
  */
 async function executeScanCommand(): Promise<void> {
@@ -322,15 +337,29 @@ const plugin: JupyterFrontEndPlugin<void> = {
       execute: executeScanCommand
     });
 
+    // Register refresh command
+    app.commands.addCommand(REFRESH_COMMAND, {
+      label: 'Refresh Kernel List',
+      caption: 'Refresh available kernels (use after CLI changes)',
+      execute: executeRefreshCommand
+    });
+
     // Add to Kernel menu
     if (mainMenu) {
-      mainMenu.kernelMenu.addGroup([{ command: SCAN_COMMAND }], 100);
+      mainMenu.kernelMenu.addGroup(
+        [{ command: SCAN_COMMAND }, { command: REFRESH_COMMAND }],
+        100
+      );
     }
 
     // Add to command palette
     if (palette) {
       palette.addItem({
         command: SCAN_COMMAND,
+        category: 'Kernel'
+      });
+      palette.addItem({
+        command: REFRESH_COMMAND,
         category: 'Kernel'
       });
     }

@@ -195,3 +195,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 64. **Task - Fix test cache pollution**: Updated tests to preserve user cache entries<br>
     **Result**: Modified `TestNameCache.clean_cache` fixture to only remove `/tmp/` entries instead of deleting entire cache file. Updated `test_load_empty_cache` -> `test_load_cache_returns_dict`, `test_save_and_load_cache`, and `test_update_name_cache` to use `/tmp/` paths for test data. User cache entries now preserved across test runs. 11 name cache tests passing
+
+65. **Task - Add Refresh Kernel List command** (v1.2.18): Added JupyterLab command for immediate kernel list refresh<br>
+    **Result**: Added `REFRESH_COMMAND` constant and `executeRefreshCommand()` function in index.ts that calls `kernelSpecManager.refreshSpecs()`. Registered command with label "Refresh Kernel List" and caption "Refresh available kernels (use after CLI changes)". Added to Kernel menu and command palette under "Kernel" category. This enables users to immediately see kernel changes made via CLI (unregister, environment deletion) without waiting for the 60-second cache timeout or running a full scan. 85 tests passing
