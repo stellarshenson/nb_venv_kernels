@@ -10,7 +10,9 @@
 
 Use Python virtual environments as Jupyter kernels. Discovers and registers kernels from venv, uv, and conda environments in JupyterLab's kernel selector.
 
-This kernel spec manager is used by [Stellars Cookiecutter Data Science](https://github.com/stellarshenson/cookiecutter-data-science) - a fork of the popular data science project template that supports both cookiecutter and copier templating engines. The template uses nb_venv_kernels to automatically manage Jupyter kernels for project environments
+This kernel spec manager is used by [Stellars Cookiecutter Data Science](https://github.com/stellarshenson/cookiecutter-data-science) - a fork of the popular data science project template that supports both cookiecutter and copier templating engines. The template uses nb_venv_kernels to automatically manage Jupyter kernels for project environments.
+
+For rich UI capabilities including kernel unregistration and virtual environment removal directly from JupyterLab, see [jupyterlab_launcher_navigate_to_kernel_extension](https://github.com/stellarshenson/jupyterlab_launcher_navigate_to_kernel_extension).
 
 Discovered environments appear in JupyterLab's kernel selector.
 
