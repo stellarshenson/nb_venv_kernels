@@ -669,13 +669,19 @@ class TestNameCache:
 
     @pytest.fixture(autouse=True)
     def clean_cache(self):
-        """Clean up name cache before and after each test."""
-        cache_path = get_name_cache_path()
-        if cache_path.exists():
-            cache_path.unlink()
+        """Clean up test entries from name cache before and after each test.
+
+        Preserves user entries (non-temp paths) while removing test entries.
+        """
+        def _clean_temp_entries():
+            """Remove only /tmp/ entries from cache, preserving user entries."""
+            cache = load_name_cache()
+            clean = {k: v for k, v in cache.items() if not k.startswith("/tmp/")}
+            save_name_cache(clean)
+
+        _clean_temp_entries()
         yield
-        if cache_path.exists():
-            cache_path.unlink()
+        _clean_temp_entries()
 
     def test_name_cache_path(self):
         """Test that name cache path is in correct location."""
@@ -685,27 +691,35 @@ class TestNameCache:
         assert "nb_venv_kernels" in str(path)
         assert "name_cache.json" in str(path)
 
-    def test_load_empty_cache(self):
-        """Test loading when cache file doesn't exist."""
+    def test_load_cache_returns_dict(self):
+        """Test that loading cache returns a dict."""
         cache = load_name_cache()
-        assert cache == {}
+        assert isinstance(cache, dict)
 
     def test_save_and_load_cache(self):
         """Test saving and loading cache data."""
-        test_data = {"/path/to/env1": "custom-name-1", "/path/to/env2": "custom-name-2"}
-        save_name_cache(test_data)
+        # Use /tmp/ paths so they get cleaned up by fixture
+        test_data = {"/tmp/test-env1": "custom-name-1", "/tmp/test-env2": "custom-name-2"}
+
+        # Get existing cache to merge with
+        existing = load_name_cache()
+        merged = {**existing, **test_data}
+        save_name_cache(merged)
 
         loaded = load_name_cache()
-        assert loaded == test_data
+        # Verify test entries are present
+        assert loaded["/tmp/test-env1"] == "custom-name-1"
+        assert loaded["/tmp/test-env2"] == "custom-name-2"
 
     def test_update_name_cache(self):
         """Test updating individual cache entries."""
-        update_name_cache("/path/to/env", "my-name")
-        assert get_cached_name("/path/to/env") == "my-name"
+        # Use /tmp/ path so it gets cleaned up by fixture
+        update_name_cache("/tmp/test-update-env", "my-name")
+        assert get_cached_name("/tmp/test-update-env") == "my-name"
 
         # Update with new name
-        update_name_cache("/path/to/env", "new-name")
-        assert get_cached_name("/path/to/env") == "new-name"
+        update_name_cache("/tmp/test-update-env", "new-name")
+        assert get_cached_name("/tmp/test-update-env") == "new-name"
 
     def test_get_cached_name_not_found(self):
         """Test getting name for non-cached path."""

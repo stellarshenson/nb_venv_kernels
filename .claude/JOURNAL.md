@@ -192,3 +192,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 63. **Task - Scan results include names**: Enhanced scan to return name information with each environment<br>
     **Result**: Modified `scan_directory()` to return lists of dicts with `path` and `name` keys instead of just path strings. Updated `manager.scan_environments()` to use names directly from scan results instead of deriving them. Scan results now show cached names (from name cache) or derived names immediately in CLI and modal output. Added `_path_in_result()` test helper. Updated 7 tests to handle new dict format. 80 tests passing (44 registry + 17 manager + 19 API)
+
+64. **Task - Fix test cache pollution**: Updated tests to preserve user cache entries<br>
+    **Result**: Modified `TestNameCache.clean_cache` fixture to only remove `/tmp/` entries instead of deleting entire cache file. Updated `test_load_empty_cache` -> `test_load_cache_returns_dict`, `test_save_and_load_cache`, and `test_update_name_cache` to use `/tmp/` paths for test data. User cache entries now preserved across test runs. 11 name cache tests passing
