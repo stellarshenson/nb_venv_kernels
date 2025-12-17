@@ -253,10 +253,10 @@ c.VEnvKernelSpecManager.require_kernelspec = True             # Only register en
 
 The extension adds commands to JupyterLab accessible via Kernel menu or Command Palette (Ctrl+Shift+C):
 
-| Command | Description |
-|---------|-------------|
-| **Scan for Virtual Environments** | Scans workspace for venv/uv/conda environments and registers them. Results displayed in modal with action indicators |
-| **Refresh Kernel List** | Immediately refreshes the kernel selector. Use after CLI register/unregister operations |
+| Command | Command ID | Description |
+|---------|------------|-------------|
+| **Scan for Virtual Environments** | `nb_venv_kernels:scan` | Scans workspace for venv/uv/conda environments and registers them. Results displayed in modal with action indicators |
+| **Refresh Kernel List** | `nb_venv_kernels:refresh` | Immediately refreshes the kernel selector. Use after CLI register/unregister operations |
 
 The kernel list is cached for 60 seconds (same as nb_conda_kernels). Use "Refresh Kernel List" for immediate updates after CLI changes.
 
