@@ -204,3 +204,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 67. **Task - Scan command cache invalidation** (v1.2.20): Enhanced Scan command to invalidate backend cache and renamed label<br>
     **Result**: Added `invalidateServerCache()` call before `refreshSpecs()` in `executeScanCommand()` for consistent cache behavior. Renamed menu label from "Scan for Python Environments" to "Scan for Virtual Environments". Updated README to match
+
+68. **Task - Remove Kernel menu items**: Removed Scan and Refresh commands from Kernel menu, kept in Command Palette only<br>
+    **Result**: Removed `IMainMenu` import and menu registration code from index.ts. Commands remain registered and accessible via Command Palette (Ctrl+Shift+C). Updated README to reference Command Palette instead of Kernel menu - modified JupyterLab Commands section, Features bullet, intro screenshot caption, and mermaid architecture diagram (MENU node renamed to PAL for Command Palette). Menu items will be provided by jupyterlab_launcher_navigate_to_kernel_extension

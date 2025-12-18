@@ -3,7 +3,6 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 
-import { IMainMenu } from '@jupyterlab/mainmenu';
 import { ICommandPalette } from '@jupyterlab/apputils';
 import { Dialog, showDialog } from '@jupyterlab/apputils';
 import { URLExt } from '@jupyterlab/coreutils';
@@ -346,12 +345,8 @@ const plugin: JupyterFrontEndPlugin<void> = {
   description:
     'Discovers Jupyter kernels from conda, venv, and uv environments',
   autoStart: true,
-  optional: [IMainMenu, ICommandPalette],
-  activate: (
-    app: JupyterFrontEnd,
-    mainMenu: IMainMenu | null,
-    palette: ICommandPalette | null
-  ) => {
+  optional: [ICommandPalette],
+  activate: (app: JupyterFrontEnd, palette: ICommandPalette | null) => {
     console.log('JupyterLab extension nb_venv_kernels is activated!');
 
     // Capture kernel spec manager for refreshing after scan
@@ -370,14 +365,6 @@ const plugin: JupyterFrontEndPlugin<void> = {
       caption: 'Refresh available kernels (use after CLI changes)',
       execute: executeRefreshCommand
     });
-
-    // Add to Kernel menu
-    if (mainMenu) {
-      mainMenu.kernelMenu.addGroup(
-        [{ command: SCAN_COMMAND }, { command: REFRESH_COMMAND }],
-        100
-      );
-    }
 
     // Add to command palette
     if (palette) {

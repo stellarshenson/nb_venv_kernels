@@ -22,9 +22,9 @@ CLI provides environment listing with status indicators.
 
 ![CLI list command](.resources/screenshot-cli.png)
 
-Scan for environments directly from JupyterLab's Kernel menu.
+Scan for environments from JupyterLab's Command Palette (Ctrl+Shift+C).
 
-![Kernel menu scan command](.resources/screenshot-menu.png)
+![Command palette scan command](.resources/screenshot-menu.png)
 
 Results display in a modal with action indicators.
 
@@ -37,7 +37,7 @@ Results display in a modal with action indicators.
 - **Smart ordering** - current environment first, then conda, uv, venv, system
 - **Drop-in replacement** - replaces [nb_conda_kernels](https://github.com/Anaconda-Platform/nb_conda_kernels) while preserving all conda functionality
 - **Directory scanning** - scan project directories to find and register environments
-- **JupyterLab integration** - scan for environments from Kernel menu with results modal
+- **JupyterLab integration** - scan for environments from Command Palette with results modal
 - **CLI management** - register, unregister, scan, list with color-coded status indicators
 - **Programmatic API** - REST endpoints and Python API for automation (`--json` flag)
 - **Zero config** - auto-enables on install, works immediately
@@ -146,7 +146,7 @@ The `register` command auto-detects uv environments via `pyvenv.cfg` and writes 
 
 ## JupyterLab Commands
 
-The extension adds commands to JupyterLab accessible via Kernel menu or Command Palette (Ctrl+Shift+C):
+The extension adds commands to JupyterLab accessible via Command Palette (Ctrl+Shift+C):
 
 | Command | Command ID | Description |
 |---------|------------|-------------|
@@ -211,7 +211,7 @@ CLI and JupyterLab interface architecture:
 flowchart LR
     subgraph Interfaces
         CLI[nb_venv_kernels CLI]
-        MENU[JupyterLab Kernel Menu]
+        PAL[JupyterLab Command Palette]
     end
 
     subgraph Server[Jupyter Server]
@@ -226,13 +226,13 @@ flowchart LR
     end
 
     CLI -->|direct| MGR
-    MENU -->|api| REST
+    PAL -->|api| REST
     REST --> MGR
     MGR --> VENV_REG
     MGR --> UV_REG
 
     style CLI stroke:#10b981,stroke-width:2px
-    style MENU stroke:#0284c7,stroke-width:2px
+    style PAL stroke:#0284c7,stroke-width:2px
     style REST stroke:#f59e0b,stroke-width:2px
     style MGR stroke:#3b82f6,stroke-width:3px
     style VENV_REG stroke:#10b981,stroke-width:2px
