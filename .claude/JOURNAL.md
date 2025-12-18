@@ -207,3 +207,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 68. **Task - Remove Kernel menu items**: Removed Scan and Refresh commands from Kernel menu, kept in Command Palette only<br>
     **Result**: Removed `IMainMenu` import and menu registration code from index.ts. Commands remain registered and accessible via Command Palette (Ctrl+Shift+C). Updated README to reference Command Palette instead of Kernel menu - modified JupyterLab Commands section, Features bullet, intro screenshot caption, and mermaid architecture diagram (MENU node renamed to PAL for Command Palette). Menu items will be provided by jupyterlab_launcher_navigate_to_kernel_extension
+
+69. **Task - Add Scan to Kernel menu** (v1.2.24): Restored Scan command in Kernel menu<br>
+    **Result**: Re-added `IMainMenu` import and menu registration in index.ts. Only "Scan for Virtual Environments" added to Kernel menu at rank 100 - Refresh command remains available only via Command Palette. This provides quick access to the scan feature from the menu while keeping the menu uncluttered
