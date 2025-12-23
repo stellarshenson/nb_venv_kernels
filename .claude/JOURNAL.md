@@ -210,3 +210,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 69. **Task - Add Scan to Kernel menu** (v1.2.24): Restored Scan command in Kernel menu<br>
     **Result**: Re-added `IMainMenu` import and menu registration in index.ts. Only "Scan for Virtual Environments" added to Kernel menu at rank 100 - Refresh command remains available only via Command Palette. This provides quick access to the scan feature from the menu while keeping the menu uncluttered
+
+70. **Task - Implement cache CLI command**: Added `cache prune` and `cache remove` subcommands<br>
+    **Result**: Added `prune_name_cache()` and `remove_name_cache()` functions to registry.py. `prune` removes cache entries not corresponding to registered environments (stale entries from deleted envs). `remove` deletes entire cache file. Both return list of removed entries with path and name. Added CLI `cache` command with `prune` and `remove` subcommands supporting `--json` flag for machine-readable output. Updated help text with examples. Added 6 tests covering prune/remove functionality including edge cases (empty cache, registered entries preserved)

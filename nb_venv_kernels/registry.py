@@ -106,6 +106,59 @@ def update_name_cache(env_path: str, name: str) -> None:
         save_name_cache(cache)
 
 
+def prune_name_cache() -> List[Dict[str, str]]:
+    """Remove cache entries that don't correspond to registered environments.
+
+    Compares cache entries against current registries (venv + uv) and removes
+    any entries whose paths are not currently registered.
+
+    Returns:
+        List of dicts with 'path' and 'name' for each removed entry.
+    """
+    with _name_cache_lock():
+        cache = load_name_cache()
+        if not cache:
+            return []
+
+        # Get all currently registered paths
+        registered_paths = set()
+        for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
+            for env_path in _read_registry_file(registry_path, include_missing=True):
+                registered_paths.add(env_path)
+
+        # Find entries to remove (not in any registry)
+        removed = []
+        new_cache = {}
+        for path, name in cache.items():
+            if path in registered_paths:
+                new_cache[path] = name
+            else:
+                removed.append({"path": path, "name": name})
+
+        # Save pruned cache
+        if removed:
+            save_name_cache(new_cache)
+
+        return removed
+
+
+def remove_name_cache() -> List[Dict[str, str]]:
+    """Remove the entire name cache file.
+
+    Returns:
+        List of dicts with 'path' and 'name' for each removed entry.
+    """
+    with _name_cache_lock():
+        cache = load_name_cache()
+        removed = [{"path": path, "name": name} for path, name in cache.items()]
+
+        cache_path = get_name_cache_path()
+        if cache_path.exists():
+            cache_path.unlink()
+
+        return removed
+
+
 @contextmanager
 def _registry_lock():
     """Context manager for registry file locking (thread/multiprocess safe).

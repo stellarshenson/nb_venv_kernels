@@ -24,6 +24,8 @@ from nb_venv_kernels.registry import (
     save_name_cache,
     get_cached_name,
     update_name_cache,
+    prune_name_cache,
+    remove_name_cache,
     _derive_env_name,
 )
 
@@ -828,3 +830,106 @@ class TestNameCache:
 
         # Cleanup
         unregister_environment(venv_path)
+
+    def test_prune_name_cache_removes_unregistered(self, temp_dir):
+        """Test that prune removes cache entries not in registries."""
+        # Add some entries to cache that are NOT registered
+        fake_path1 = "/tmp/prune-test-fake-env-1"
+        fake_path2 = "/tmp/prune-test-fake-env-2"
+        update_name_cache(fake_path1, "fake-name-1")
+        update_name_cache(fake_path2, "fake-name-2")
+
+        # Verify they're in cache
+        assert get_cached_name(fake_path1) == "fake-name-1"
+        assert get_cached_name(fake_path2) == "fake-name-2"
+
+        # Prune should remove them (they're not registered)
+        removed = prune_name_cache()
+
+        # Verify both were removed
+        removed_paths = [r["path"] for r in removed]
+        assert fake_path1 in removed_paths
+        assert fake_path2 in removed_paths
+
+        # Verify they're no longer in cache
+        assert get_cached_name(fake_path1) is None
+        assert get_cached_name(fake_path2) is None
+
+    def test_prune_name_cache_keeps_registered(self, temp_dir):
+        """Test that prune keeps cache entries that are registered."""
+        venv_path = os.path.join(temp_dir, "prune-keep-test", ".venv")
+        os.makedirs(os.path.dirname(venv_path))
+        subprocess.run(["python", "-m", "venv", venv_path], check=True, capture_output=True)
+        _install_ipykernel(venv_path)
+
+        # Register with custom name
+        register_environment(venv_path, name="keep-this-name")
+        assert get_cached_name(venv_path) == "keep-this-name"
+
+        # Prune should NOT remove this entry
+        removed = prune_name_cache()
+        removed_paths = [r["path"] for r in removed]
+        assert venv_path not in removed_paths
+
+        # Verify still in cache
+        assert get_cached_name(venv_path) == "keep-this-name"
+
+        # Cleanup
+        unregister_environment(venv_path)
+
+    def test_prune_name_cache_returns_removed_entries(self):
+        """Test that prune returns list of removed entries with path and name."""
+        fake_path = "/tmp/prune-return-test"
+        update_name_cache(fake_path, "prune-test-name")
+
+        removed = prune_name_cache()
+
+        # Find our entry in removed list
+        our_entry = next((r for r in removed if r["path"] == fake_path), None)
+        assert our_entry is not None
+        assert our_entry["path"] == fake_path
+        assert our_entry["name"] == "prune-test-name"
+
+    def test_remove_name_cache_deletes_all(self):
+        """Test that remove deletes entire cache and returns all entries."""
+        # Add some test entries
+        fake_path1 = "/tmp/remove-test-1"
+        fake_path2 = "/tmp/remove-test-2"
+        update_name_cache(fake_path1, "remove-name-1")
+        update_name_cache(fake_path2, "remove-name-2")
+
+        # Remove entire cache
+        removed = remove_name_cache()
+
+        # Verify entries were returned
+        removed_paths = [r["path"] for r in removed]
+        assert fake_path1 in removed_paths
+        assert fake_path2 in removed_paths
+
+        # Verify cache file is deleted
+        cache_path = get_name_cache_path()
+        assert not cache_path.exists()
+
+        # Verify load returns empty dict
+        cache = load_name_cache()
+        assert cache == {}
+
+    def test_remove_name_cache_empty_returns_empty_list(self):
+        """Test that remove on empty cache returns empty list."""
+        # Ensure cache is empty first
+        cache_path = get_name_cache_path()
+        if cache_path.exists():
+            cache_path.unlink()
+
+        removed = remove_name_cache()
+        assert removed == []
+
+    def test_prune_name_cache_empty_returns_empty_list(self):
+        """Test that prune on empty cache returns empty list."""
+        # Ensure cache is empty first
+        cache_path = get_name_cache_path()
+        if cache_path.exists():
+            cache_path.unlink()
+
+        removed = prune_name_cache()
+        assert removed == []

@@ -14,7 +14,12 @@ from .manager import (
     is_path_within_workspace,
     path_relative_to_workspace,
 )
-from .registry import is_global_conda_environment
+from .registry import (
+    is_global_conda_environment,
+    get_name_cache_path,
+    prune_name_cache,
+    remove_name_cache,
+)
 
 
 class Colors:
@@ -336,18 +341,22 @@ Commands:
   config enable       Enable VEnvKernelSpecManager in Jupyter config
   config disable      Disable VEnvKernelSpecManager in Jupyter config
   config show         Show current config location and status
+  cache prune         Remove stale cache entries (not in registries)
+  cache remove        Remove entire name cache
 
 Options:
   register -n NAME    Custom display name for the environment
   scan --path PATH    Directory to scan (default: workspace root)
   scan --depth N      Maximum directory depth to scan (default: 7)
   scan --dry-run      Dry run: scan and report without changes
+  cache --json        Output removed entries in JSON format
 
 Notes:
   - scan and register also cleanup non-existent environments from registries
   - conda environments found during scan are reported but not registered
     (they are discovered automatically via conda env list)
   - custom names are stored in registry and used in kernel selector
+  - name cache persists path-to-name mappings across unregister/re-scan cycles
 
 Examples:
   nb_venv_kernels scan                          # Scan workspace root
@@ -357,6 +366,8 @@ Examples:
   nb_venv_kernels register /path/to/.venv
   nb_venv_kernels register .venv -n "My Project"  # With custom name
   nb_venv_kernels list
+  nb_venv_kernels cache prune                   # Remove stale cache entries
+  nb_venv_kernels cache remove --json           # Remove all cache, output JSON
 """)
 
 
@@ -466,6 +477,22 @@ def main():
         "--path",
         help="Custom config directory path",
         default=None,
+    )
+
+    # cache command
+    cache_parser = subparsers.add_parser(
+        "cache",
+        help="Manage name cache",
+    )
+    cache_parser.add_argument(
+        "action",
+        choices=["prune", "remove"],
+        help="prune (keep only registered entries) or remove (delete entire cache)",
+    )
+    cache_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output in JSON format",
     )
 
     args = parser.parse_args()
@@ -756,6 +783,35 @@ def main():
             else:
                 print("Status: Config file does not exist")
             print()
+
+    elif args.command == "cache":
+        json_output = getattr(args, 'json', False)
+
+        if args.action == "prune":
+            removed = prune_name_cache()
+            if json_output:
+                print(json.dumps({"removed": removed, "count": len(removed)}, indent=2))
+            else:
+                if removed:
+                    print(f"Pruned {len(removed)} cache entries:")
+                    for entry in removed:
+                        print(f"  {entry['name']}: {entry['path']}")
+                else:
+                    print("No stale cache entries found.")
+                print()
+
+        elif args.action == "remove":
+            removed = remove_name_cache()
+            if json_output:
+                print(json.dumps({"removed": removed, "count": len(removed)}, indent=2))
+            else:
+                if removed:
+                    print(f"Removed {len(removed)} cache entries:")
+                    for entry in removed:
+                        print(f"  {entry['name']}: {entry['path']}")
+                else:
+                    print("Cache was already empty.")
+                print()
 
     else:
         print_help()
