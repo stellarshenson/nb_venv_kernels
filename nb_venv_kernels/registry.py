@@ -159,6 +159,39 @@ def remove_name_cache() -> List[Dict[str, str]]:
         return removed
 
 
+def refresh_name_cache() -> List[Dict[str, str]]:
+    """Update cache with entries for all registered environments.
+
+    Reads all registered environments (venv + uv) and ensures each has a cache entry.
+    Uses custom name from registry if available, otherwise derives name from path.
+
+    Returns:
+        List of dicts with 'path' and 'name' for each added/updated entry.
+    """
+    with _name_cache_lock():
+        cache = load_name_cache()
+        updated = []
+
+        # Read all registered environments with their names
+        for registry_path in [get_venv_registry_path(), get_uv_registry_path()]:
+            for env_path, custom_name in _read_registry_file(registry_path,
+                                                              include_missing=True,
+                                                              include_names=True):
+                # Determine the name to use
+                name = custom_name if custom_name else _derive_env_name(env_path)
+
+                # Add/update if not in cache or name differs
+                if env_path not in cache or cache[env_path] != name:
+                    cache[env_path] = name
+                    updated.append({"path": env_path, "name": name})
+
+        # Save updated cache
+        if updated:
+            save_name_cache(cache)
+
+        return updated
+
+
 @contextmanager
 def _registry_lock():
     """Context manager for registry file locking (thread/multiprocess safe).

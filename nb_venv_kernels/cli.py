@@ -17,7 +17,9 @@ from .manager import (
 from .registry import (
     is_global_conda_environment,
     get_name_cache_path,
+    load_name_cache,
     prune_name_cache,
+    refresh_name_cache,
     remove_name_cache,
 )
 
@@ -341,18 +343,21 @@ Commands:
   config enable       Enable VEnvKernelSpecManager in Jupyter config
   config disable      Disable VEnvKernelSpecManager in Jupyter config
   config show         Show current config location and status
-  cache prune         Remove stale cache entries (not in registries)
-  cache remove        Remove entire name cache
+  cache --list        List all cache entries
+  cache --update      Update cache with all registered environments
+  cache --prune       Remove stale cache entries (not in registries)
+  cache --remove      Remove entire name cache
 
 Options:
   register -n NAME    Custom display name for the environment
   scan --path PATH    Directory to scan (default: workspace root)
   scan --depth N      Maximum directory depth to scan (default: 7)
   scan --dry-run      Dry run: scan and report without changes
-  cache --json        Output removed entries in JSON format
+  cache --json        Output entries in JSON format
 
 Notes:
   - scan and register also cleanup non-existent environments from registries
+  - scan automatically updates the name cache with all registered environments
   - conda environments found during scan are reported but not registered
     (they are discovered automatically via conda env list)
   - custom names are stored in registry and used in kernel selector
@@ -366,8 +371,10 @@ Examples:
   nb_venv_kernels register /path/to/.venv
   nb_venv_kernels register .venv -n "My Project"  # With custom name
   nb_venv_kernels list
-  nb_venv_kernels cache prune                   # Remove stale cache entries
-  nb_venv_kernels cache remove --json           # Remove all cache, output JSON
+  nb_venv_kernels cache --list                  # List cache entries
+  nb_venv_kernels cache --update                # Sync cache with registries
+  nb_venv_kernels cache --prune                 # Remove stale cache entries
+  nb_venv_kernels cache --remove --json         # Remove all cache, output JSON
 """)
 
 
@@ -484,10 +491,26 @@ def main():
         "cache",
         help="Manage name cache",
     )
-    cache_parser.add_argument(
-        "action",
-        choices=["prune", "remove"],
-        help="prune (keep only registered entries) or remove (delete entire cache)",
+    cache_action = cache_parser.add_mutually_exclusive_group(required=True)
+    cache_action.add_argument(
+        "--list",
+        action="store_true",
+        help="List all cache entries",
+    )
+    cache_action.add_argument(
+        "--update",
+        action="store_true",
+        help="Update cache with all registered environments",
+    )
+    cache_action.add_argument(
+        "--prune",
+        action="store_true",
+        help="Remove stale cache entries (not in registries)",
+    )
+    cache_action.add_argument(
+        "--remove",
+        action="store_true",
+        help="Remove entire name cache",
     )
     cache_parser.add_argument(
         "--json",
@@ -636,6 +659,9 @@ def main():
             if spinner:
                 spinner.start()
             result = manager.scan_environments(scan_path, max_depth=depth, dry_run=dry_run)
+            # Update cache with all registered environments after scan
+            if not dry_run:
+                refresh_name_cache()
             if spinner:
                 spinner.stop()
         except ValueError as e:
@@ -787,7 +813,34 @@ def main():
     elif args.command == "cache":
         json_output = getattr(args, 'json', False)
 
-        if args.action == "prune":
+        if getattr(args, 'list', False):
+            cache = load_name_cache()
+            if json_output:
+                entries = [{"path": path, "name": name} for path, name in cache.items()]
+                print(json.dumps({"entries": entries, "count": len(entries)}, indent=2))
+            else:
+                if cache:
+                    print(f"Cache entries ({len(cache)}):")
+                    for path, name in sorted(cache.items(), key=lambda x: x[1].lower()):
+                        print(f"  {name}: {path}")
+                else:
+                    print("Cache is empty.")
+                print()
+
+        elif getattr(args, 'update', False):
+            updated = refresh_name_cache()
+            if json_output:
+                print(json.dumps({"updated": updated, "count": len(updated)}, indent=2))
+            else:
+                if updated:
+                    print(f"Updated {len(updated)} cache entries:")
+                    for entry in updated:
+                        print(f"  {entry['name']}: {entry['path']}")
+                else:
+                    print("Cache is up to date.")
+                print()
+
+        elif getattr(args, 'prune', False):
             removed = prune_name_cache()
             if json_output:
                 print(json.dumps({"removed": removed, "count": len(removed)}, indent=2))
@@ -800,7 +853,7 @@ def main():
                     print("No stale cache entries found.")
                 print()
 
-        elif args.action == "remove":
+        elif getattr(args, 'remove', False):
             removed = remove_name_cache()
             if json_output:
                 print(json.dumps({"removed": removed, "count": len(removed)}, indent=2))

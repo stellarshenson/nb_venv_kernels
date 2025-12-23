@@ -8,9 +8,9 @@ has_binder: false
 has_settings: false
 kind: frontend-and-server
 labextension_name: nb_venv_kernels
-project_short_description: Jupyterlab extension to detect notebook kernels similarly
-    to how nb_conda_kernel does
+project_short_description:
+  Jupyterlab extension to detect notebook kernels similarly
+  to how nb_conda_kernel does
 python_name: nb_venv_kernels
 repository: ''
 test: true
-
