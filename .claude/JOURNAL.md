@@ -219,3 +219,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 72. **Task - Cache update and scan sync**: Added `--update` flag and automatic cache sync on scan<br>
     **Result**: Added `refresh_name_cache()` function in registry.py that reads all registered environments (venv + uv) and ensures each has a cache entry using custom name from registry or derived name. Added `--update` flag to cache command (mutually exclusive with list/prune/remove). Scan command now calls `refresh_name_cache()` after successful scan (not dry_run) to ensure all registered environments are in cache. Updated help text with note about scan automatically updating cache
+
+73. **Task - Publish v1.2.30**: Published package to PyPI and npm<br>
+    **Result**: Version 1.2.30 published with cache command improvements: `--list`, `--update`, `--prune`, `--remove` flags and automatic cache sync on scan
