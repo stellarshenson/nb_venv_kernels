@@ -222,3 +222,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 73. **Task - Publish v1.2.30**: Published package to PyPI and npm<br>
     **Result**: Version 1.2.30 published with cache command improvements: `--list`, `--update`, `--prune`, `--remove` flags and automatic cache sync on scan
+
+74. **Task - Scan performance optimization**: Fixed scan timeout caused by symlinked mountpoints<br>
+    **Result**: Added three scan optimizations to `scan_config.json` and `registry.py`: (1) `skip_symlinks: true` skips symlinked directories to avoid traversing mounted drives like OneDrive; (2) `project_indicators` list (pyproject.toml, setup.py, package.json, Cargo.toml, etc.) - when detected, scanner looks for venv and stops recursion since source subdirs won't have separate venvs; (3) `venv_directory_names` configures which folder names to check (.venv, venv, env, etc.). Added helper functions `_should_skip_symlinks()`, `_get_project_indicators()`, `_get_venv_directory_names()`, `_has_project_indicator()`, `_has_venv_directory()`. Result: scan time reduced from timeout (>2min) to 0.10 seconds for full workspace with depth 10

@@ -1,4 +1,26 @@
 {
+  "skip_symlinks": true,
+  "project_indicators": [
+    "setup.py",
+    "pyproject.toml",
+    "setup.cfg",
+    "environment.yml",
+    "environment.yaml",
+    "package.json",
+    "Cargo.toml",
+    "go.mod",
+    "pom.xml",
+    "build.gradle",
+    "*.Rproj"
+  ],
+  "venv_directory_names": [
+    ".venv",
+    "venv",
+    ".env",
+    "env",
+    ".virtualenv",
+    "virtualenv"
+  ],
   "skip_directories": [
     ".git",
     ".hg",

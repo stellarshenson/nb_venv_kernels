@@ -774,6 +774,68 @@ def _is_cache_path(path: str) -> bool:
     return any(pattern in path for pattern in patterns)
 
 
+def _get_project_indicators() -> List[str]:
+    """Get list of project indicator filenames from config."""
+    config = _load_scan_config()
+    return config.get("project_indicators", [])
+
+
+def _should_skip_symlinks() -> bool:
+    """Check if symlinks should be skipped during scan."""
+    config = _load_scan_config()
+    return config.get("skip_symlinks", True)
+
+
+def _get_venv_directory_names() -> set:
+    """Get set of venv directory names from config."""
+    config = _load_scan_config()
+    return set(config.get("venv_directory_names", [".venv", "venv"]))
+
+
+def _has_project_indicator(dir_path: str) -> bool:
+    """Check if directory contains any project indicator file.
+
+    Supports glob patterns like *.Rproj for R project files.
+    """
+    import fnmatch
+
+    try:
+        entries = os.listdir(dir_path)
+    except (PermissionError, OSError):
+        return False
+
+    indicators = _get_project_indicators()
+    for indicator in indicators:
+        if '*' in indicator:
+            # Glob pattern - check if any entry matches
+            if any(fnmatch.fnmatch(entry, indicator) for entry in entries):
+                return True
+        else:
+            # Exact filename match
+            if indicator in entries:
+                return True
+    return False
+
+
+def _has_venv_directory(dir_path: str) -> Optional[str]:
+    """Check if directory contains a venv directory.
+
+    Returns the venv path if found, None otherwise.
+    """
+    venv_names = _get_venv_directory_names()
+    try:
+        entries = os.listdir(dir_path)
+    except (PermissionError, OSError):
+        return None
+
+    for entry in entries:
+        if entry in venv_names:
+            venv_path = os.path.join(dir_path, entry)
+            if os.path.isdir(venv_path) and is_valid_environment(venv_path):
+                return venv_path
+    return None
+
+
 def cleanup_registries(require_kernelspec: bool = False) -> Dict[str, List[Dict[str, str]]]:
     """Remove invalid environments from both registries.
 
@@ -990,8 +1052,46 @@ def scan_directory(root_path: str, max_depth: int = 10,
     ignore = []
     conda_found = []
 
-    # Common venv directory names
-    venv_names = {".venv", "venv", ".env", "env", ".virtualenv", "virtualenv"}
+    # Get venv directory names from config
+    venv_names = _get_venv_directory_names()
+
+    def _process_venv(full_path: str):
+        """Process a found venv environment."""
+        # Check if environment has kernelspec (ipykernel installed)
+        has_kernel = _has_kernelspec(full_path)
+        if require_kernelspec and not has_kernel:
+            # Only ignore if require_kernelspec is True
+            env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+            ignore.append({"path": full_path, "name": env_name})
+        elif dry_run:
+            # In dry run, check if already registered
+            existing = read_environments_with_names()
+            existing_dict = {p: n for p, n in existing}
+            if full_path in existing_dict:
+                skipped.append({"path": full_path, "name": existing_dict[full_path] or _derive_env_name(full_path)})
+            else:
+                env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                registered.append({"path": full_path, "name": env_name})
+        else:
+            # Try to register - use cached name if available
+            cached_name = get_cached_name(full_path)
+            try:
+                was_registered, was_updated = register_environment(
+                    full_path, name=cached_name,
+                    require_kernelspec=require_kernelspec
+                )
+                # Get the final name from cache (updated by register_environment)
+                final_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                if was_registered:
+                    registered.append({"path": full_path, "name": final_name})
+                elif was_updated:
+                    updated.append({"path": full_path, "name": final_name})
+                else:
+                    skipped.append({"path": full_path, "name": final_name})
+            except ValueError:
+                # Only happens if require_kernelspec=True and no kernel
+                env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                ignore.append({"path": full_path, "name": env_name})
 
     def scan_recursive(current_path: str, depth: int):
         if max_depth is not None and depth > max_depth:
@@ -1002,13 +1102,32 @@ def scan_directory(root_path: str, max_depth: int = 10,
         except PermissionError:
             return
 
+        # Check if this directory is a project (has project indicators)
+        is_project = _has_project_indicator(current_path)
+
+        if is_project:
+            # This is a project directory - check for venv and stop recursion
+            venv_path = _has_venv_directory(current_path)
+            if venv_path:
+                # Found venv in project - process it
+                if not is_conda_environment(venv_path):
+                    _process_venv(venv_path)
+                else:
+                    conda_found.append(venv_path)
+            # Don't recurse further into project directories
+            # (source code, tests, etc. won't have their own venvs)
+            return
+
+        # Not a project directory - scan entries normally
+        skip_dirs = _get_skip_directories()
+        skip_symlinks = _should_skip_symlinks()
+
         for entry in entries:
             # Skip hidden directories (except known venv names)
             if entry.startswith(".") and entry not in venv_names:
                 continue
 
             # Skip directories from config
-            skip_dirs = _get_skip_directories()
             if entry in skip_dirs or entry.endswith(".egg-info"):
                 continue
 
@@ -1021,46 +1140,16 @@ def scan_directory(root_path: str, max_depth: int = 10,
             if not os.path.isdir(full_path):
                 continue
 
+            # Skip symlinks if configured (avoids traversing mounted drives)
+            if skip_symlinks and os.path.islink(full_path):
+                continue
+
             # Check if this is a valid environment
             if is_valid_environment(full_path):
                 if is_conda_environment(full_path):
                     conda_found.append(full_path)
                 else:
-                    # Check if environment has kernelspec (ipykernel installed)
-                    has_kernel = _has_kernelspec(full_path)
-                    if require_kernelspec and not has_kernel:
-                        # Only ignore if require_kernelspec is True
-                        env_name = get_cached_name(full_path) or _derive_env_name(full_path)
-                        ignore.append({"path": full_path, "name": env_name})
-                    elif dry_run:
-                        # In dry run, check if already registered
-                        existing = read_environments_with_names()
-                        existing_dict = {p: n for p, n in existing}
-                        if full_path in existing_dict:
-                            skipped.append({"path": full_path, "name": existing_dict[full_path] or _derive_env_name(full_path)})
-                        else:
-                            env_name = get_cached_name(full_path) or _derive_env_name(full_path)
-                            registered.append({"path": full_path, "name": env_name})
-                    else:
-                        # Try to register - use cached name if available
-                        cached_name = get_cached_name(full_path)
-                        try:
-                            was_registered, was_updated = register_environment(
-                                full_path, name=cached_name,
-                                require_kernelspec=require_kernelspec
-                            )
-                            # Get the final name from cache (updated by register_environment)
-                            final_name = get_cached_name(full_path) or _derive_env_name(full_path)
-                            if was_registered:
-                                registered.append({"path": full_path, "name": final_name})
-                            elif was_updated:
-                                updated.append({"path": full_path, "name": final_name})
-                            else:
-                                skipped.append({"path": full_path, "name": final_name})
-                        except ValueError:
-                            # Only happens if require_kernelspec=True and no kernel
-                            env_name = get_cached_name(full_path) or _derive_env_name(full_path)
-                            ignore.append({"path": full_path, "name": env_name})
+                    _process_venv(full_path)
                 # Don't recurse into environments
                 continue
 
