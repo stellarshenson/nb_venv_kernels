@@ -42,6 +42,8 @@ jobs:
           branch: ${{ github.event.inputs.branch }}
           since: ${{ github.event.inputs.since }}
           since_last_stable: ${{ github.event.inputs.since_last_stable }}
+        env:
+          RH_SINCE_LAST_STABLE: 'true'
 
       - name: '** Next Step **'
         run: |
