@@ -228,3 +228,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 75. **Task - Fix jupyter-releaser tag detection**: Fixed CI build-changelog failure caused by custom tags<br>
     **Result**: jupyter-releaser was failing with "No activity found between FIX_SCAN_PERFORMANCE_SYMLINKS_PROJECT_BOUNDARIES and None" because it detected the custom tag as the "since" reference. The solution was adding `RH_SINCE_LAST_STABLE: 'true'` environment variable to check-release.yml and prep-release.yml workflows. This environment variable makes jupyter-releaser only consider semantic version tags matching `\d\.\d\.\d$` pattern, ignoring custom tags like FIX_*. This allows keeping milestone tags while maintaining proper release changelog generation
+
+76. **Task - Add nb_conda_kernels dependency**: Added nb_conda_kernels as explicit dependency<br>
+    **Result**: Added `nb_conda_kernels` to dependencies list in pyproject.toml alongside filelock. This ensures conda kernel discovery is available when nb_venv_kernels is installed
