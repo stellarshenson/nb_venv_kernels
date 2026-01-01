@@ -231,3 +231,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 76. **Task - Add nb_conda_kernels dependency**: Added nb_conda_kernels as explicit dependency<br>
     **Result**: Added `nb_conda_kernels` to dependencies list in pyproject.toml alongside filelock. This ensures conda kernel discovery is available when nb_venv_kernels is installed
+
+77. **Task - Skip build-changelog in workflows**: Disabled automatic changelog generation that requires PRs<br>
+    **Result**: Added `steps_to_skip: "build-changelog"` to both check-release.yml and prep-release.yml workflows. jupyter-releaser generates changelog from GitHub PRs, but since commits are pushed directly without PRs, the build-changelog step fails. Skipping this step allows the release workflow to proceed with manually maintained CHANGELOG.md
