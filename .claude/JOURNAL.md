@@ -229,8 +229,11 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 75. **Task - Fix jupyter-releaser tag detection**: Fixed CI build-changelog failure caused by custom tags<br>
     **Result**: jupyter-releaser was failing with "No activity found between FIX_SCAN_PERFORMANCE_SYMLINKS_PROJECT_BOUNDARIES and None" because it detected the custom tag as the "since" reference. The solution was adding `RH_SINCE_LAST_STABLE: 'true'` environment variable to check-release.yml and prep-release.yml workflows. This environment variable makes jupyter-releaser only consider semantic version tags matching `\d\.\d\.\d$` pattern, ignoring custom tags like FIX_*. This allows keeping milestone tags while maintaining proper release changelog generation
 
-76. **Task - Add nb_conda_kernels dependency**: Added nb_conda_kernels as explicit dependency<br>
-    **Result**: Added `nb_conda_kernels` to dependencies list in pyproject.toml alongside filelock. This ensures conda kernel discovery is available when nb_venv_kernels is installed
+76. **Task - Add nb_conda_kernels dependency**: Attempted to add nb_conda_kernels as explicit dependency<br>
+    **Result**: Added `nb_conda_kernels` to dependencies in pyproject.toml - later reverted in entry 78
 
 77. **Task - Skip build-changelog in workflows**: Disabled automatic changelog generation that requires PRs<br>
-    **Result**: Added `steps_to_skip: "build-changelog"` to both check-release.yml and prep-release.yml workflows. jupyter-releaser generates changelog from GitHub PRs, but since commits are pushed directly without PRs, the build-changelog step fails. Skipping this step allows the release workflow to proceed with manually maintained CHANGELOG.md
+    **Result**: Added `steps_to_skip: "build-changelog"` to both check-release.yml and prep-release.yml workflows. jupyter-releaser generates changelog from GitHub PRs using query `repo:owner/repo type:pr`. Since commits are pushed directly without PRs, the build-changelog step fails with "No activity found". Skipping this step allows the release workflow to proceed with manually maintained CHANGELOG.md. Combined with `RH_SINCE_LAST_STABLE: 'true'` from entry 75, the full jupyter-releaser fix involves: (1) only consider semantic version tags for "since" reference, (2) skip PR-based changelog generation
+
+78. **Task - Remove nb_conda_kernels dependency**: Reverted conda-only package from pip dependencies<br>
+    **Result**: Removed `nb_conda_kernels` from pyproject.toml dependencies. The package is only available via conda, not PyPI, causing CI failure: "Could not find a version that satisfies the requirement nb-conda-kernels". Users must install nb_conda_kernels separately via conda if they want conda environment discovery
