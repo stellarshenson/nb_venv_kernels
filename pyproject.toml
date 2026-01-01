@@ -24,7 +24,6 @@ classifiers = [
 ]
 dependencies = [
     "filelock",
-    "nb_conda_kernels",
 ]
 dynamic = ["version", "description", "authors", "urls", "keywords"]
 
