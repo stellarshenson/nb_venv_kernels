@@ -237,3 +237,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 78. **Task - Remove nb_conda_kernels dependency**: Reverted conda-only package from pip dependencies<br>
     **Result**: Removed `nb_conda_kernels` from pyproject.toml dependencies. The package is only available via conda, not PyPI, causing CI failure: "Could not find a version that satisfies the requirement nb-conda-kernels". Users must install nb_conda_kernels separately via conda if they want conda environment discovery
+
+79. **Task - Document jupyter-releaser CI/CD fixes**: Created workspace-level documentation for JupyterLab extension CI/CD<br>
+    **Result**: Created `/home/lab/workspace/.claude/JUPYTERLAB_EXTENSION.md` documenting the complete jupyter-releaser fix for direct-commit workflows. The fix requires two workflow changes: (1) `RH_SINCE_LAST_STABLE: 'true'` env var to filter custom tags and only consider semantic version tags matching `\d\.\d\.\d$` pattern; (2) `steps_to_skip: "build-changelog"` to bypass PR-based changelog generation since jupyter-releaser queries `repo:owner/repo type:pr` which returns empty for direct commits. Also documented that conda-only packages like nb_conda_kernels cannot be pip dependencies. Added reference in workspace CLAUDE.md rules
