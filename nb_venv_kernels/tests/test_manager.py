@@ -265,6 +265,29 @@ class TestCondaKernelDiscovery:
                 timeout=60
             )
 
+    def test_get_conda_env_name_base_installations(self, manager):
+        """Test _get_conda_env_name returns 'base' for conda base installations."""
+        base_paths = [
+            "/opt/conda",
+            "/home/user/anaconda3",
+            "/home/user/miniconda",
+            "/opt/miniconda3",
+            "/usr/local/miniforge3",
+            "/home/user/mambaforge",
+        ]
+        for path in base_paths:
+            assert manager._get_conda_env_name(path) == "base", f"Expected 'base' for {path}"
+
+    def test_get_conda_env_name_named_envs(self, manager):
+        """Test _get_conda_env_name returns directory name for named envs."""
+        named_paths = [
+            ("/opt/conda/envs/myenv", "myenv"),
+            ("/home/user/anaconda3/envs/data-science", "data-science"),
+            ("/home/user/.conda/envs/test-env", "test-env"),
+        ]
+        for path, expected in named_paths:
+            assert manager._get_conda_env_name(path) == expected, f"Expected '{expected}' for {path}"
+
 
 class TestMixedEnvironments:
     """Tests for mixed environment scenarios."""

@@ -500,6 +500,19 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 seen_names[name] = 1
         return environments
 
+    def _get_conda_env_name(self, env_path: str) -> str:
+        """Get display name for conda environment.
+
+        Returns 'base' for conda base installations, otherwise the directory name.
+        """
+        env_dir = basename(env_path)
+        if env_dir.lower() in (
+            "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
+            "miniforge", "miniforge3", "mambaforge", "mambaforge3"
+        ):
+            return "base"
+        return env_dir
+
     def list_environments(self):
         """List all registered environments with their status.
 
@@ -623,7 +636,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
             seen_paths.add(env_path)
 
         for env_path in result["conda_found"]:
-            env_name = os.path.basename(env_path)
+            env_name = self._get_conda_env_name(env_path)
             environments.append(get_env_info(env_path, "conda", "keep", env_name, exists=True))
             seen_paths.add(env_path)
 
@@ -631,7 +644,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
         global_conda_count = 0
         for env_path in get_conda_environments():
             if env_path not in seen_paths:
-                env_name = os.path.basename(env_path)
+                env_name = self._get_conda_env_name(env_path)
                 environments.append(get_env_info(env_path, "conda", "keep", env_name))
                 global_conda_count += 1
 
