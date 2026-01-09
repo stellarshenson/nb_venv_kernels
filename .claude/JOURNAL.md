@@ -243,3 +243,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 80. **Task - Fix conda base name in scan**: Fixed scan showing "conda" instead of "base" for conda base environment<br>
     **Result**: Added `_get_conda_env_name()` helper method to VEnvKernelSpecManager that returns "base" for conda base installations (/opt/conda, anaconda3, miniconda, miniforge, mambaforge) and the directory name for other envs. Updated `scan_environments()` to use this helper for conda environment names. Previously used `os.path.basename()` which returned "conda" for `/opt/conda`. Added tests `test_get_conda_env_name_base_installations` and `test_get_conda_env_name_named_envs` to TestCondaKernelDiscovery
+
+81. **Task - Publish v1.2.36**: Published package with conda base name fix<br>
+    **Result**: Version 1.2.36 published to PyPI and npm with fix for conda base environment naming in scan results
