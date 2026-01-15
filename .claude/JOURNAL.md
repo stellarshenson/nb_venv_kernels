@@ -246,3 +246,6 @@ This journal tracks substantive work on documents, diagrams, and documentation c
 
 81. **Task - Publish v1.2.36**: Published package with conda base name fix<br>
     **Result**: Version 1.2.36 published to PyPI and npm with fix for conda base environment naming in scan results
+
+82. **Task - Write Medium article**: Created article about automatic kernel management with nb_venv_kernels<br>
+    **Result**: Created `doc/ARTICLE_MEDIUM.md` contrasting traditional manual kernel registration (`python -m ipykernel install --user --name=...`) with nb_venv_kernels automatic discovery. Covers local project environments with uv/venv, scan command, CLI listing, JupyterLab integration, comparison table, and complete workflow example. Inspired by Bishal Sharma's conda environments article but focused on eliminating manual kernel registration friction
