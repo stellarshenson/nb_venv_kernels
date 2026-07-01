@@ -395,6 +395,14 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
     def find_kernel_specs(self):
         """Returns a dict mapping kernel names to resource directories."""
+        # Default ipykernel names that notebooks reference by default (these are
+        # the names renamed to "py"/"r" for venv/conda specs above). Keep them in
+        # the listing so a notebook saved with e.g. kernelspec.name == "python3"
+        # still auto-binds its kernel instead of opening with "No Kernel" - an
+        # unbound notebook leaves the jupyterlab-lsp virtual document disposed,
+        # which breaks the cell context menu on right-click.
+        default_kernel_names = ("python3", "python2", "ir")
+
         if self.venv_only:
             kspecs = {}
         else:
@@ -405,9 +413,9 @@ class VEnvKernelSpecManager(KernelSpecManager):
         spec_rev = {v: k for k, v in kspecs.items()}
 
         for name, spec in venv_kspecs.items():
-            # Remove system kernel with same resource_dir
+            # Remove system kernel with same resource_dir (keep default names)
             dup = spec_rev.get(spec.resource_dir)
-            if dup and dup != name:
+            if dup and dup != name and dup not in default_kernel_names:
                 del kspecs[dup]
             kspecs[name] = spec.resource_dir
 
@@ -417,6 +425,8 @@ class VEnvKernelSpecManager(KernelSpecManager):
             conda_resource_dirs = {spec.resource_dir for spec in conda_kspecs.values()}
 
             for sys_name in list(kspecs.keys()):
+                if sys_name in default_kernel_names:
+                    continue
                 if kspecs[sys_name] in conda_resource_dirs:
                     del kspecs[sys_name]
 
