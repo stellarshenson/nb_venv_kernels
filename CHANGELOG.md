@@ -2,6 +2,13 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.44
+
+### Maintenance
+
+- Version-sync release with no functional changes - keeps the npm and PyPI packages current
+- Kernel discovery behaviour is unchanged from 1.2.40 (default `python3` kernelspec kept in the listing so standard notebooks bind a kernel, matching vanilla JupyterLab)
+
 ## 1.2.40
 
 ### Default python3 Kernelspec Restored
