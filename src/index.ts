@@ -3,8 +3,6 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 
-import { IMainMenu } from '@jupyterlab/mainmenu';
-import { ICommandPalette } from '@jupyterlab/apputils';
 import { Dialog, showDialog } from '@jupyterlab/apputils';
 import { URLExt } from '@jupyterlab/coreutils';
 import { ServerConnection, KernelSpec } from '@jupyterlab/services';
@@ -346,47 +344,30 @@ const plugin: JupyterFrontEndPlugin<void> = {
   description:
     'Discovers Jupyter kernels from conda, venv, and uv environments',
   autoStart: true,
-  optional: [IMainMenu, ICommandPalette],
-  activate: (
-    app: JupyterFrontEnd,
-    mainMenu: IMainMenu | null,
-    palette: ICommandPalette | null
-  ) => {
+  activate: (app: JupyterFrontEnd) => {
     console.log('JupyterLab extension nb_venv_kernels is activated!');
 
     // Capture kernel spec manager for refreshing after scan
     kernelSpecManager = app.serviceManager.kernelspecs;
 
-    // Register scan command
+    // Register the scan command. Its execute renders the scan results modal.
+    // It is triggered by the app-launcher applet and the companion
+    // jupyterlab_nb_venv_kernels_ui_extension. This extension deliberately adds
+    // no Kernel-menu or Command-Palette entry of its own - those menu items and
+    // launcher cards belong to the companion and the applet.
     app.commands.addCommand(SCAN_COMMAND, {
       label: 'Scan for Virtual Environments',
       caption: 'Scan workspace for venv/uv/conda environments',
       execute: executeScanCommand
     });
 
-    // Register refresh command
+    // Register the refresh command, invoked programmatically by the companion
+    // UI extension after registry changes. Also headless - no menu/palette.
     app.commands.addCommand(REFRESH_COMMAND, {
       label: 'Refresh Kernel List',
       caption: 'Refresh available kernels (use after CLI changes)',
       execute: executeRefreshCommand
     });
-
-    // Add to Kernel menu
-    if (mainMenu) {
-      mainMenu.kernelMenu.addGroup([{ command: SCAN_COMMAND }], 100);
-    }
-
-    // Add to command palette
-    if (palette) {
-      palette.addItem({
-        command: SCAN_COMMAND,
-        category: 'Kernel'
-      });
-      palette.addItem({
-        command: REFRESH_COMMAND,
-        category: 'Kernel'
-      });
-    }
   }
 };
 

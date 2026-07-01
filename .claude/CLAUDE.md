@@ -604,3 +604,21 @@ agentic-solution-components-02-knowledge-graph.png
 > Advises about risks or negative outcomes of certain actions.
 
 - no claude coauthoring in git
+
+## Mandatory Bans (Reinforced)
+
+The following workspace rules are STRICTLY ENFORCED for this project:
+
+- **No automatic git tags** - only create tags when user explicitly requests
+- **No automatic version changes** - only modify version in package.json/pyproject.toml/etc. when user explicitly requests
+- **No automatic publishing** - never run `make publish`, `npm publish`, `twine upload`, or similar without explicit user request
+- **No manual package installs if Makefile exists** - use `make install` or equivalent Makefile targets, not direct `pip install`/`uv install`/`npm install`
+- **No automatic git commits or pushes** - only when user explicitly requests
+
+## Journal Rules (Project-Specific)
+
+- **APPEND ONLY**: New journal entries MUST be appended at the end of the file, never inserted between existing entries
+- Entries maintain strict chronological order by position - the last entry in the file is always the most recent work
+- Never reorder, move, or insert entries out of sequence
+- The Stellars **journal plugin** is the canonical tool for this file: create via `/journal:create`, append via `/journal:update`, archive via `/journal:archive`. The `journal:journal` skill auto-triggers on any mention of "journal" and runs `journal-tools check` after every write
+- Direct edits to `JOURNAL.md` are a last resort - prefer the plugin so modus secundis format, continuous numbering and append-only order are enforced automatically

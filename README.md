@@ -22,14 +22,6 @@ CLI provides environment listing with status indicators.
 
 ![CLI list command](.resources/screenshot-cli.png)
 
-Scan for environments from JupyterLab's Command Palette (Ctrl+Shift+C).
-
-![Command palette scan command](.resources/screenshot-menu.png)
-
-Results display in a modal with action indicators.
-
-![Scan results modal](.resources/screenshot-modal.png)
-
 ## Features
 
 - **Unified kernel discovery** - conda, venv, and uv environments in one kernel selector
@@ -37,7 +29,7 @@ Results display in a modal with action indicators.
 - **Smart ordering** - current environment first, then conda, uv, venv, system
 - **Drop-in replacement** - replaces [nb_conda_kernels](https://github.com/Anaconda-Platform/nb_conda_kernels) while preserving all conda functionality
 - **Directory scanning** - scan project directories to find and register environments
-- **JupyterLab integration** - scan for environments from Command Palette with results modal
+- **JupyterLab integration** - discovered kernels appear automatically in the kernel selector; interactive UI via the [companion extension](https://github.com/stellarshenson/jupyterlab_nb_venv_kernels_ui_extension)
 - **CLI management** - register, unregister, scan, list with color-coded status indicators
 - **Programmatic API** - REST endpoints and Python API for automation (`--json` flag)
 - **Zero config** - auto-enables on install, works immediately
@@ -146,14 +138,13 @@ The `register` command auto-detects uv environments via `pyvenv.cfg` and writes 
 
 ## JupyterLab Commands
 
-The extension adds commands to JupyterLab accessible via Command Palette (Ctrl+Shift+C):
+> [!NOTE]
+> `nb_venv_kernels` adds **no Kernel-menu item and no Command Palette entry of its own**. It registers the two command IDs below; the `scan` command renders a results modal when run. These commands are triggered by the companion [jupyterlab_nb_venv_kernels_ui_extension](https://github.com/stellarshenson/jupyterlab_nb_venv_kernels_ui_extension) and the app-launcher applet, which own the menu items and launcher cards that invoke them.
 
-| Command                           | Command ID                | Description                                                                                                          |
-| --------------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **Scan for Virtual Environments** | `nb_venv_kernels:scan`    | Scans workspace for venv/uv/conda environments and registers them. Results displayed in modal with action indicators |
-| **Refresh Kernel List**           | `nb_venv_kernels:refresh` | Immediately refreshes the kernel selector. Use after CLI register/unregister operations                              |
-
-The kernel list is cached for 60 seconds (same as nb_conda_kernels). Use "Refresh Kernel List" for immediate updates after CLI changes.
+| Command ID                | Purpose                                                                    |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `nb_venv_kernels:scan`    | Scan the workspace for venv/uv/conda environments; shows the results modal |
+| `nb_venv_kernels:refresh` | Refresh the kernel list after registry changes (bypasses the 60s cache)    |
 
 ## How It Works
 
@@ -211,7 +202,7 @@ CLI and JupyterLab interface architecture:
 flowchart LR
     subgraph Interfaces
         CLI[nb_venv_kernels CLI]
-        PAL[JupyterLab Command Palette]
+        UI[Companion UI extension]
     end
 
     subgraph Server[Jupyter Server]
@@ -226,13 +217,13 @@ flowchart LR
     end
 
     CLI -->|direct| MGR
-    PAL -->|api| REST
+    UI -->|api| REST
     REST --> MGR
     MGR --> VENV_REG
     MGR --> UV_REG
 
     style CLI stroke:#10b981,stroke-width:2px
-    style PAL stroke:#0284c7,stroke-width:2px
+    style UI stroke:#0284c7,stroke-width:2px
     style REST stroke:#f59e0b,stroke-width:2px
     style MGR stroke:#3b82f6,stroke-width:3px
     style VENV_REG stroke:#10b981,stroke-width:2px
@@ -244,7 +235,7 @@ flowchart LR
 - Kernel order: current environment first, then conda, uv, venv, system
 - Caches results for 60 seconds
 - `config enable` backs up existing config, `config disable` restores from backup
-- CLI calls VEnvKernelSpecManager directly; JupyterLab frontend uses REST endpoints
+- CLI calls VEnvKernelSpecManager directly; the companion UI extension uses the REST endpoints
 
 For detailed technical documentation, see [Environment Discovery Mechanism](doc/NB_VENV_KERNELS_MECHANICS.md).
 

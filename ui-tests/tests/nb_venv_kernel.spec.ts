@@ -31,26 +31,3 @@ test('should register scan command', async ({ page }) => {
 
   expect(hasCommand).toBe(true);
 });
-
-test('should have scan command in command palette', async ({ page }) => {
-  await page.goto();
-
-  // Open command palette with Ctrl+Shift+C
-  await page.keyboard.press('Control+Shift+c');
-
-  // Wait for command palette to appear
-  await page.waitForSelector('.lm-CommandPalette');
-
-  // Type to search for the scan command
-  await page.keyboard.type('Scan for Virtual');
-
-  // Wait for search results
-  await page.waitForTimeout(500);
-
-  // Check that scan command appears in results
-  const scanItem = page.locator('.lm-CommandPalette-item', {
-    hasText: 'Scan for Virtual Environments'
-  });
-
-  await expect(scanItem).toBeVisible();
-});
