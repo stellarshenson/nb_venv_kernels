@@ -2,6 +2,14 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.40
+
+### Default python3 Kernelspec Restored
+
+- Notebooks saved with the standard `python3` kernel now bind again instead of opening with "No Kernel"
+- `find_kernel_specs()` keeps the default `python3`/`python2`/`ir` specs instead of deduping them against the conda base environment
+- Fixes an empty/degraded cell context menu (missing Jump to definition, inert items) that occurred when a notebook could not bind a kernel and jupyterlab-lsp's virtual document was disposed
+
 ## 1.2.9
 
 ### Configurable Scan Exclusions

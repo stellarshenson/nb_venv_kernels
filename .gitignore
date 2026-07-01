@@ -127,3 +127,9 @@ dmypy.json
 
 # Yarn cache
 .yarn/
+
+# local scratch / debugging artifacts (not part of the package)
+.playwright-mcp/
+uv.lock
+jump.png
+issue.png
