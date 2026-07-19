@@ -217,11 +217,25 @@ Kernel merging removes duplicates:
 
 ```python
 # Remove system kernels that have same resource_dir as conda kernels
-conda_resource_dirs = {spec.resource_dir for spec in conda_kspecs.values()}
+conda_resource_dirs = {realpath(spec.resource_dir) for spec in conda_kspecs.values()}
 for sys_name in list(kspecs.keys()):
-    if kspecs[sys_name] in conda_resource_dirs:
+    if sys_name in default_kernel_names:  # python3/python2/ir stay listed
+        continue
+    if realpath(kspecs[sys_name]) in conda_resource_dirs:
         del kspecs[sys_name]
 ```
+
+Default kernel names (`python3`, `python2`, `ir`) are never removed from the
+listing - a notebook saved with `kernelspec.name == "python3"` must keep
+auto-binding its kernel (DEF-1). When a conda/venv spec shares its
+`resource_dir` with such a default name, the alias is collapsed onto the
+default name instead of being listed twice: `find_kernel_specs()` records the
+richer spec in `_default_name_overrides` and `get_kernel_spec("python3")`
+serves it, so one environment renders as one env-labelled tile
+(`Python [conda env:base] *`) while the alias name stays resolvable for
+server-side starts. If an `allowed_kernelspecs` allowlist keeps only one of
+the two names, the collapse is cancelled and the surviving name is listed with
+its own spec.
 
 ## Step 7: Jupyter Integration
 
@@ -296,17 +310,24 @@ All registry operations use file locking via the `filelock` package (cross-platf
 
 ## Caching Strategy
 
-Single-level caching with 60-second TTL:
+Two pieces of derived state, both owned by `invalidate_cache()`:
 
-| Cache                 | TTL | Contents                     |
-| --------------------- | --- | ---------------------------- |
-| `_venv_kernels_cache` | 60s | Processed KernelSpec objects |
+| State                     | TTL                  | Contents                                        |
+| ------------------------- | -------------------- | ----------------------------------------------- |
+| `_venv_kernels_cache`     | 60s                  | Processed KernelSpec objects                    |
+| `_default_name_overrides` | rebuilt each listing | Default names collapsed onto conda/venv specs   |
 
-Cache invalidation occurs after:
+`_default_name_overrides` uses a `None` sentinel for "never computed";
+`get_kernel_spec()` repopulates it via a fresh listing on a cold start or
+whenever the venv cache TTL has lapsed, so name lookups never serve a stale
+collapsed spec.
+
+Cache invalidation (`invalidate_cache()`) occurs after:
 
 - `register_environment()`
 - `unregister_environment()`
 - `scan_environments()` (unless dry_run=True)
+- the `/nb-venv-kernels/refresh` API route
 
 API routes use the server's kernel spec manager singleton when available, ensuring cache invalidation affects the kernel picker immediately without page refresh.
 

@@ -164,6 +164,12 @@ class VEnvKernelSpecManager(KernelSpecManager):
         self._venv_kernels_cache = None
         self._venv_kernels_cache_expiry = None
 
+        # Default kernel names (python3/...) collapsed onto a richer conda/venv
+        # spec for the same resource_dir; rebuilt by find_kernel_specs().
+        # None = never computed - get_kernel_spec() populates on demand so a
+        # kernel started by name on a fresh boot resolves identically.
+        self._default_name_overrides = None
+
         # Create separate CondaKernelSpecManager instance for conda kernels
         self._conda_manager = None
         if _HAS_CONDA:
@@ -359,6 +365,31 @@ class VEnvKernelSpecManager(KernelSpecManager):
             return {}
         return self._conda_manager._conda_kspecs
 
+    def invalidate_cache(self):
+        """Drop derived kernel-spec state so the next listing rebuilds it."""
+        self._venv_kernels_cache = None
+        self._venv_kernels_cache_expiry = None
+        self._default_name_overrides = None
+
+    @staticmethod
+    def _rank_spec(spec):
+        """Classify a KernelSpec into the sort rank scheme.
+
+        0 - Current environment (marked with *)
+        1 - Conda kernels
+        2 - UV kernels
+        3 - Venv kernels
+        """
+        display_name = getattr(spec, 'display_name', '') or ''
+        metadata = getattr(spec, 'metadata', {}) or {}
+        if display_name.endswith(' *') or metadata.get('venv_is_currently_running'):
+            return 0
+        if metadata.get('venv_source') == 'uv':
+            return 2
+        if 'venv_source' in metadata:
+            return 3
+        return 1
+
     def _get_kernel_sort_key(self, kernel_name):
         """Return sort key for kernel ordering.
 
@@ -369,26 +400,19 @@ class VEnvKernelSpecManager(KernelSpecManager):
         3 - Venv kernels
         4 - System kernels
         """
-        # Check if current environment (venv/uv)
         venv_spec = self._venv_kspecs.get(kernel_name)
         if venv_spec:
-            metadata = getattr(venv_spec, 'metadata', {}) or {}
-            if metadata.get('venv_is_currently_running'):
-                return (0, kernel_name)
-            source = metadata.get('venv_source', 'venv')
-            if source == 'uv':
-                return (2, kernel_name)
-            return (3, kernel_name)
+            return (self._rank_spec(venv_spec), kernel_name)
 
-        # Check if conda kernel
         if _HAS_CONDA and not self.venv_only:
-            if kernel_name in self._conda_kspecs:
-                # Check if current conda env
-                conda_spec = self._conda_kspecs[kernel_name]
-                display_name = getattr(conda_spec, 'display_name', '')
-                if display_name.endswith(' *'):
-                    return (0, kernel_name)
-                return (1, kernel_name)
+            conda_spec = self._conda_kspecs.get(kernel_name)
+            if conda_spec is not None:
+                return (self._rank_spec(conda_spec), kernel_name)
+
+        # Default name collapsed onto a conda/venv spec - rank as that spec
+        override = (self._default_name_overrides or {}).get(kernel_name)
+        if override is not None:
+            return (self._rank_spec(override), kernel_name)
 
         # System kernel
         return (4, kernel_name)
@@ -403,6 +427,17 @@ class VEnvKernelSpecManager(KernelSpecManager):
         # which breaks the cell context menu on right-click.
         default_kernel_names = ("python3", "python2", "ir")
 
+        # When a conda/venv spec provides the SAME resource_dir as a kept
+        # default name, the alias is collapsed onto the default name instead of
+        # being listed twice: the default name stays in the listing (binding
+        # guarantee above) and get_kernel_spec() serves the richer env-labelled
+        # spec for it, so one environment renders as one properly named tile.
+        overrides = {}
+        override_aliases = {}  # default name -> collapsed alias name
+
+        # realpath so symlinked prefixes still collide on the same kernel dir
+        realpath = os.path.realpath
+
         if self.venv_only:
             kspecs = {}
         else:
@@ -410,27 +445,49 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
         # Add venv kernels
         venv_kspecs = self._venv_kspecs
-        spec_rev = {v: k for k, v in kspecs.items()}
+        spec_rev = {realpath(v): k for k, v in kspecs.items()}
 
         for name, spec in venv_kspecs.items():
             # Remove system kernel with same resource_dir (keep default names)
-            dup = spec_rev.get(spec.resource_dir)
-            if dup and dup != name and dup not in default_kernel_names:
-                del kspecs[dup]
+            dup = spec_rev.get(realpath(spec.resource_dir))
+            if dup and dup != name:
+                if dup in default_kernel_names:
+                    if dup not in overrides:
+                        # Collapse alias onto the default name - not listed twice
+                        overrides[dup] = spec
+                        override_aliases[dup] = name
+                        continue
+                    # Default already collapsed by another alias - list normally
+                else:
+                    # pop, not del: two aliases can realpath-collide on the
+                    # same system kernel; the second lookup must not crash
+                    kspecs.pop(dup, None)
             kspecs[name] = spec.resource_dir
 
         # Add conda kernels, removing duplicate system kernels
         if _HAS_CONDA and not self.venv_only:
             conda_kspecs = self._conda_kspecs
-            conda_resource_dirs = {spec.resource_dir for spec in conda_kspecs.values()}
+            conda_resource_dirs = {
+                realpath(spec.resource_dir) for spec in conda_kspecs.values()
+            }
 
             for sys_name in list(kspecs.keys()):
                 if sys_name in default_kernel_names:
                     continue
-                if kspecs[sys_name] in conda_resource_dirs:
+                if realpath(kspecs[sys_name]) in conda_resource_dirs:
                     del kspecs[sys_name]
 
+            # resource_dirs currently listed under a spared default name
+            default_rd_to_name = {
+                realpath(kspecs[n]): n for n in default_kernel_names if n in kspecs
+            }
             for name, spec in conda_kspecs.items():
+                collapsed = default_rd_to_name.get(realpath(spec.resource_dir))
+                if collapsed is not None and collapsed != name and collapsed not in overrides:
+                    # Collapse alias onto the default name - do not list twice
+                    overrides[collapsed] = spec
+                    override_aliases[collapsed] = name
+                    continue
                 if name not in kspecs:
                     kspecs[name] = spec.resource_dir
 
@@ -438,6 +495,17 @@ class VEnvKernelSpecManager(KernelSpecManager):
         allow = getattr(self, "allowed_kernelspecs", None) or getattr(self, "whitelist", None)
         if allow:
             kspecs = {k: v for k, v in kspecs.items() if k in allow}
+            # A collapse whose default name or alias the allowlist rejects is
+            # cancelled so an excluded alias spec is never served under the
+            # default name. (The base class already filters system names by
+            # allowed_kernelspecs, so a disallowed default never collapses -
+            # its allowed alias then simply lists under its own name.)
+            for def_name in list(overrides.keys()):
+                if def_name not in allow or override_aliases[def_name] not in allow:
+                    del overrides[def_name]
+
+        # Publish overrides before sorting so the sort key sees them
+        self._default_name_overrides = overrides
 
         # Sort kernels: current first, then conda, uv, venv, system
         sorted_names = sorted(kspecs.keys(), key=self._get_kernel_sort_key)
@@ -445,6 +513,20 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
     def get_kernel_spec(self, kernel_name):
         """Returns a KernelSpec instance for the given kernel_name."""
+        # Default names collapsed onto a richer conda/venv spec (same
+        # resource_dir) resolve to that spec so the tile carries the
+        # environment-labelled display name. Overrides are derived by
+        # find_kernel_specs() - populate them on a cold start (fresh boot, no
+        # prior listing) and whenever the venv cache TTL has lapsed, so a
+        # kernel started by name never resolves a stale collapsed spec.
+        expiry = self._venv_kernels_cache_expiry
+        if (self._default_name_overrides is None
+                or expiry is None or expiry < time.time()):
+            self.find_kernel_specs()
+        override = self._default_name_overrides.get(kernel_name)
+        if override is not None:
+            return override
+
         # Check venv kernels first
         res = self._venv_kspecs.get(kernel_name)
         if res is not None:
@@ -696,8 +778,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
         # Invalidate cache after scan (if not dry run)
         if not dry_run:
-            self._venv_kernels_cache = None
-            self._venv_kernels_cache_expiry = None
+            self.invalidate_cache()
 
         # Resolve name conflicts before returning (mark changed names as "update")
         environments = self._resolve_name_conflicts(environments, update_action_on_change=True)
@@ -731,8 +812,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 path, name=name, require_kernelspec=self.require_kernelspec
             )
             # Invalidate cache
-            self._venv_kernels_cache = None
-            self._venv_kernels_cache_expiry = None
+            self.invalidate_cache()
             return {"path": path, "registered": registered, "updated": updated, "name": name, "error": None}
         except ValueError as e:
             return {"path": path, "registered": False, "updated": False, "name": name, "error": str(e)}
@@ -750,8 +830,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
         unregistered = unregister_environment(path)
         if unregistered:
             # Invalidate cache
-            self._venv_kernels_cache = None
-            self._venv_kernels_cache_expiry = None
+            self.invalidate_cache()
         return {"path": path, "unregistered": unregistered}
 
     def _get_env_display_name(self, env_path, env_type, custom_name=None):

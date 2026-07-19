@@ -175,7 +175,7 @@ Common fixtures used across test files:
 | uv_available    | Skips test if uv not installed                          |
 | conda_available | Skips test if conda not available or times out          |
 
-Helper function `invalidate_cache(manager)` clears the manager's kernel cache after `register_environment()` calls to ensure newly registered environments are discovered by `find_kernel_specs()`.
+Helper function `invalidate_cache(manager)` delegates to the manager's own `invalidate_cache()` (kernel cache plus default-name overrides) after `register_environment()` calls to ensure newly registered environments are discovered by `find_kernel_specs()`.
 
 ## Environment Requirements
 

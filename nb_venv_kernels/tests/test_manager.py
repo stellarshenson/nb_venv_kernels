@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 
 import pytest
 
@@ -28,15 +29,13 @@ def manager():
     """Create a fresh VEnvKernelSpecManager instance."""
     m = VEnvKernelSpecManager()
     # Clear cache to ensure fresh state
-    m._venv_kernels_cache = None
-    m._venv_kernels_cache_expiry = None
+    m.invalidate_cache()
     return m
 
 
 def invalidate_cache(manager):
     """Invalidate manager cache to force re-discovery."""
-    manager._venv_kernels_cache = None
-    manager._venv_kernels_cache_expiry = None
+    manager.invalidate_cache()
 
 
 class TestVenvKernelDiscovery:
@@ -265,6 +264,25 @@ class TestCondaKernelDiscovery:
                 timeout=60
             )
 
+    def test_conda_base_renders_single_listing_entry(self, manager, conda_available):
+        """DEF-2 premise on a real install: one env, one listing entry.
+
+        Pins that the nb_conda_kernels base alias and the on-disk python3 spec
+        actually share a (realpath) resource_dir and get collapsed - if a
+        future nb_conda_kernels stops sharing it, this rung catches the no-op.
+        """
+        from collections import defaultdict
+        from nb_venv_kernels.manager import _HAS_CONDA
+        if not _HAS_CONDA:
+            pytest.skip("nb_conda_kernels not installed")
+
+        specs = manager.find_kernel_specs()
+        by_rd = defaultdict(list)
+        for name, rd in specs.items():
+            by_rd[os.path.realpath(rd)].append(name)
+        dups = {rd: names for rd, names in by_rd.items() if len(names) > 1}
+        assert not dups, f"one environment must render one listing entry, got: {dups}"
+
     def test_get_conda_env_name_base_installations(self, manager):
         """Test _get_conda_env_name returns 'base' for conda base installations."""
         base_paths = [
@@ -462,6 +480,338 @@ class TestKernelSpecDetails:
         # Cleanup
         unregister_environment(venv1_path)
         unregister_environment(venv2_path)
+
+
+class TestDefaultKernelDedup:
+    """Tests for collapsing conda/venv aliases onto default kernel names.
+
+    A conda/venv spec sharing its resource_dir with a spared default name
+    (python3/python2/ir) must yield ONE listing entry: the default name stays
+    listed (notebook auto-bind guarantee - DEF-1 guard) and carries the richer
+    environment-labelled display name; the alias is not listed twice but stays
+    resolvable by name.
+    """
+
+    BASE_RD = "/fake/conda/share/jupyter/kernels/python3"
+
+    def _make_spec(self, resource_dir, display_name, metadata=None):
+        from jupyter_client.kernelspec import KernelSpec
+        return KernelSpec(
+            resource_dir=resource_dir,
+            display_name=display_name,
+            language="python",
+            argv=["/fake/bin/python", "-m", "ipykernel_launcher", "-f", "{connection_file}"],
+            metadata=metadata or {},
+        )
+
+    def _make_manager(self, monkeypatch, system_specs, conda_specs=None, venv_specs=None,
+                      **manager_kwargs):
+        """Build a manager with faked system/conda/venv kernel sources."""
+        import nb_venv_kernels.manager as manager_module
+        from jupyter_client.kernelspec import KernelSpecManager
+
+        m = VEnvKernelSpecManager(**manager_kwargs)
+        # The real base class filters system names by allowed_kernelspecs
+        # inside find_kernel_specs - the fake must model that contract
+        monkeypatch.setattr(
+            KernelSpecManager,
+            "find_kernel_specs",
+            lambda self: {
+                k: v for k, v in dict(system_specs).items()
+                if not self.allowed_kernelspecs or k in self.allowed_kernelspecs
+            },
+        )
+        # Fake venv kernels via the cache (bypasses registry scan)
+        m._venv_kernels_cache = venv_specs or {}
+        m._venv_kernels_cache_expiry = time.time() + 3600
+
+        # Fake conda kernels regardless of nb_conda_kernels being installed
+        monkeypatch.setattr(manager_module, "_HAS_CONDA", True)
+
+        class FakeCondaManager:
+            _conda_kspecs = conda_specs or {}
+
+        m._conda_manager = FakeCondaManager()
+        return m
+
+    def _make_collided_manager(self, monkeypatch):
+        """Manager with the canonical base-env collision (python3 vs conda-base-py)."""
+        conda_spec = self._make_spec(self.BASE_RD, "Python [conda env:base] *")
+        return self._make_manager(
+            monkeypatch,
+            system_specs={"python3": self.BASE_RD},
+            conda_specs={"conda-base-py": conda_spec},
+        )
+
+    def test_conda_base_alias_collapsed_onto_python3(self, monkeypatch):
+        """conda-base-py sharing python3's resource_dir yields one python3 entry."""
+        m = self._make_collided_manager(monkeypatch)
+        specs = m.find_kernel_specs()
+        assert "python3" in specs, "python3 must stay listed (DEF-1 auto-bind guard)"
+        assert "conda-base-py" not in specs, "alias must not be listed twice"
+        # Exactly one listing entry for the shared resource_dir
+        assert list(specs.values()).count(self.BASE_RD) == 1
+
+    def test_collapsed_python3_carries_env_display_name(self, monkeypatch):
+        """python3 resolves to the conda spec so the tile shows the env name."""
+        m = self._make_collided_manager(monkeypatch)
+        m.find_kernel_specs()
+        spec = m.get_kernel_spec("python3")
+        assert spec.display_name == "Python [conda env:base] *"
+        all_specs = m.get_all_specs()
+        assert all_specs["python3"]["spec"]["display_name"] == "Python [conda env:base] *"
+
+    def test_collapsed_alias_still_resolvable_by_name(self, monkeypatch):
+        """Saved notebooks referencing conda-base-py can still start server-side."""
+        m = self._make_collided_manager(monkeypatch)
+        m.find_kernel_specs()
+        assert m.get_kernel_spec("conda-base-py").display_name == "Python [conda env:base] *"
+
+    def test_no_collision_leaves_both_listed(self, monkeypatch):
+        """A conda env with its own resource_dir does not touch python3."""
+        other_rd = "/fake/conda/envs/ds/share/jupyter/kernels/python3"
+        conda_spec = self._make_spec(other_rd, "Python [conda env:ds]")
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"python3": self.BASE_RD},
+            conda_specs={"conda-env-ds-py": conda_spec},
+        )
+        specs = m.find_kernel_specs()
+        assert "python3" in specs
+        assert "conda-env-ds-py" in specs
+        # python3 keeps its own (system) spec resolution path
+        assert m._default_name_overrides == {}
+
+    def test_venv_alias_collapsed_onto_python3(self, monkeypatch):
+        """A venv spec colliding with the spared python3 collapses onto it."""
+        venv_rd = "/fake/project/.venv/share/jupyter/kernels/python3"
+        venv_spec = self._make_spec(
+            venv_rd,
+            "Python [venv env:project] *",
+            metadata={"venv_source": "venv", "venv_is_currently_running": True},
+        )
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"python3": venv_rd},
+            venv_specs={"venv-project-py": venv_spec},
+        )
+        specs = m.find_kernel_specs()
+        assert "python3" in specs, "python3 must stay listed (DEF-1 auto-bind guard)"
+        assert "venv-project-py" not in specs, "alias must not be listed twice"
+        assert m.get_kernel_spec("python3").display_name == "Python [venv env:project] *"
+        # Collapsed venv alias stays resolvable by name (server-side starts)
+        assert m.get_kernel_spec("venv-project-py").display_name == "Python [venv env:project] *"
+
+    def test_collapsed_current_env_sorts_first(self, monkeypatch):
+        """A collapsed python3 carrying a current-env (*) display ranks first."""
+        conda_spec = self._make_spec(self.BASE_RD, "Python [conda env:base] *")
+        other_rd = "/fake/conda/envs/ds/share/jupyter/kernels/python3"
+        other_spec = self._make_spec(other_rd, "Python [conda env:ds]")
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"python3": self.BASE_RD},
+            conda_specs={"conda-base-py": conda_spec, "conda-env-ds-py": other_spec},
+        )
+        specs = m.find_kernel_specs()
+        assert list(specs.keys())[0] == "python3"
+
+    def test_overrides_cleared_when_collision_gone(self, monkeypatch):
+        """Stale overrides do not survive a re-listing without collisions."""
+        m = self._make_collided_manager(monkeypatch)
+        m.find_kernel_specs()
+        assert "python3" in m._default_name_overrides
+        # Conda kernels disappear (e.g. nb_conda_kernels removed)
+        m._conda_manager._conda_kspecs = {}
+        m.find_kernel_specs()
+        assert m._default_name_overrides == {}
+
+    def test_cold_start_get_kernel_spec_resolves_override(self, monkeypatch):
+        """A kernel started by name before any listing resolves identically."""
+        m = self._make_collided_manager(monkeypatch)
+        # No find_kernel_specs() call - fresh boot POST /api/kernels path
+        spec = m.get_kernel_spec("python3")
+        assert spec.display_name == "Python [conda env:base] *"
+
+    def test_invalidate_cache_resets_overrides(self, monkeypatch):
+        """invalidate_cache() drops overrides so the next resolve recomputes."""
+        m = self._make_collided_manager(monkeypatch)
+        m.find_kernel_specs()
+        assert m._default_name_overrides
+        m.invalidate_cache()
+        assert m._default_name_overrides is None
+        # Cold resolve after invalidation repopulates via a fresh listing
+        assert m.get_kernel_spec("python3").display_name == "Python [conda env:base] *"
+
+    def test_venv_only_ignores_collapse_machinery(self, monkeypatch):
+        """venv_only=True hides system/conda kernels and records no overrides."""
+        venv_rd = "/fake/project/.venv/share/jupyter/kernels/python3"
+        venv_spec = self._make_spec(
+            venv_rd, "Python [venv env:project]", metadata={"venv_source": "venv"}
+        )
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"python3": venv_rd},
+            venv_specs={"venv-project-py": venv_spec},
+            venv_only=True,
+        )
+        specs = m.find_kernel_specs()
+        assert "python3" not in specs
+        assert "venv-project-py" in specs
+        assert m._default_name_overrides == {}
+
+    def test_collapsed_ranks_follow_alias_source(self, monkeypatch):
+        """Collapsed defaults rank as their alias: conda 1, uv 2, venv 3."""
+        conda_rd = "/fake/conda/share/jupyter/kernels/python3"
+        uv_rd = "/fake/uvproj/.venv/share/jupyter/kernels/python2"
+        venv_rd = "/fake/venvproj/.venv/share/jupyter/kernels/ir"
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"python3": conda_rd, "python2": uv_rd, "ir": venv_rd,
+                          "zz-system": "/fake/system/kernels/zz"},
+            conda_specs={
+                "conda-base-py": self._make_spec(conda_rd, "Python [conda env:base]"),
+            },
+            venv_specs={
+                "venv-uvproj-py": self._make_spec(
+                    uv_rd, "Python [uv env:uvproj]", metadata={"venv_source": "uv"}
+                ),
+                "venv-venvproj-r": self._make_spec(
+                    venv_rd, "R [venv env:venvproj]", metadata={"venv_source": "venv"}
+                ),
+            },
+        )
+        specs = m.find_kernel_specs()
+        # conda-collapsed (1) < uv-collapsed (2) < venv-collapsed (3) < system (4)
+        assert list(specs.keys()) == ["python3", "python2", "ir", "zz-system"]
+
+    def test_allowlist_keeping_both_names_keeps_collapse(self, monkeypatch):
+        """Allowlist containing both names: single collapsed entry survives."""
+        m = self._make_collided_manager(monkeypatch)
+        m.allowed_kernelspecs = {"python3", "conda-base-py"}
+        specs = m.find_kernel_specs()
+        assert list(specs.keys()) == ["python3"]
+        assert m.get_kernel_spec("python3").display_name == "Python [conda env:base] *"
+
+    def test_allowlist_of_alias_only_keeps_env_visible(self, monkeypatch):
+        """Allowlist naming only the alias must not make the env vanish."""
+        m = self._make_collided_manager(monkeypatch)
+        m.allowed_kernelspecs = {"conda-base-py"}
+        specs = m.find_kernel_specs()
+        # Base class filters python3 out, so no collapse: alias lists normally
+        assert "conda-base-py" in specs, "allowed alias must stay listed"
+        assert "python3" not in specs
+        assert m._default_name_overrides == {}
+
+    def test_allowlist_excluding_alias_drops_override(self, monkeypatch):
+        """Allowlist excluding the alias must not serve its spec via python3."""
+        m = self._make_collided_manager(monkeypatch)
+        m.allowed_kernelspecs = {"python3"}
+        specs = m.find_kernel_specs()
+        assert list(specs.keys()) == ["python3"]
+        assert m._default_name_overrides == {}
+
+    def test_ttl_expiry_recomputes_overrides(self, monkeypatch):
+        """A lapsed venv-cache TTL must re-resolve overrides on name lookup."""
+        m = self._make_collided_manager(monkeypatch)
+        # The lapse triggers a real venv rescan - keep it off the developer's registry
+        monkeypatch.setattr(VEnvKernelSpecManager, "_all_venv_specs", lambda self: {})
+        m.find_kernel_specs()
+        assert m.get_kernel_spec("python3").display_name == "Python [conda env:base] *"
+        # Conda source changes while only REST name-lookups arrive (headless)
+        m._conda_manager._conda_kspecs = {
+            "conda-base-py": self._make_spec(self.BASE_RD, "Python [conda env:base] renamed")
+        }
+        m._venv_kernels_cache_expiry = time.time() - 1
+        assert m.get_kernel_spec("python3").display_name == "Python [conda env:base] renamed"
+
+    def test_register_environment_invalidates_overrides(self, monkeypatch):
+        """Mutating the registry resets overrides via invalidate_cache()."""
+        import nb_venv_kernels.manager as manager_module
+        m = self._make_collided_manager(monkeypatch)
+        m.find_kernel_specs()
+        assert m._default_name_overrides
+        monkeypatch.setattr(
+            manager_module, "register_environment",
+            lambda path, name=None, require_kernelspec=False: (True, False),
+        )
+        m.register_environment("/fake/other-env")
+        assert m._default_name_overrides is None
+
+    def test_realpath_collision_through_symlink(self, tmp_path, monkeypatch):
+        """A symlinked prefix still collides with the real kernel dir."""
+        real_kernels = tmp_path / "real" / "share" / "jupyter" / "kernels" / "python3"
+        real_kernels.mkdir(parents=True)
+        os.symlink(tmp_path / "real", tmp_path / "link")
+        linked_rd = str(tmp_path / "link" / "share" / "jupyter" / "kernels" / "python3")
+        conda_spec = self._make_spec(str(real_kernels), "Python [conda env:base] *")
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"python3": linked_rd},
+            conda_specs={"conda-base-py": conda_spec},
+        )
+        specs = m.find_kernel_specs()
+        assert "python3" in specs
+        assert "conda-base-py" not in specs, "symlinked prefix must still collapse"
+        assert m.get_kernel_spec("python3").display_name == "Python [conda env:base] *"
+
+    def test_dual_collision_first_alias_wins_second_lists(self, monkeypatch):
+        """venv and conda both colliding with python3: first collapse wins."""
+        venv_spec = self._make_spec(
+            self.BASE_RD, "Python [venv env:baseenv]", metadata={"venv_source": "venv"}
+        )
+        conda_spec = self._make_spec(self.BASE_RD, "Python [conda env:base] *")
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"python3": self.BASE_RD},
+            conda_specs={"conda-base-py": conda_spec},
+            venv_specs={"venv-baseenv-py": venv_spec},
+        )
+        specs = m.find_kernel_specs()
+        assert "python3" in specs
+        assert m.get_kernel_spec("python3").display_name == "Python [venv env:baseenv]"
+        assert "venv-baseenv-py" not in specs
+        # The second alias is not silently dropped - it lists under its own name
+        assert "conda-base-py" in specs
+
+    def test_dual_venv_collision_second_alias_lists(self, monkeypatch):
+        """Two venv specs colliding with python3: second lists under own name."""
+        rd = "/fake/project/.venv/share/jupyter/kernels/python3"
+        first = self._make_spec(
+            rd, "Python [venv env:one]", metadata={"venv_source": "venv"}
+        )
+        second = self._make_spec(
+            rd, "Python [venv env:two]", metadata={"venv_source": "venv"}
+        )
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"python3": rd},
+            venv_specs={"venv-one-py": first, "venv-two-py": second},
+        )
+        specs = m.find_kernel_specs()
+        assert "python3" in specs
+        assert m.get_kernel_spec("python3").display_name == "Python [venv env:one]"
+        assert "venv-one-py" not in specs
+        assert "venv-two-py" in specs, "second alias must not be silently dropped"
+
+    def test_double_realpath_collision_on_system_kernel_no_crash(self, monkeypatch):
+        """Two venv specs deduping one non-default system kernel must not crash."""
+        rd = "/fake/tool/.venv/share/jupyter/kernels/mykern"
+        first = self._make_spec(
+            rd, "Python [venv env:one]", metadata={"venv_source": "venv"}
+        )
+        second = self._make_spec(
+            rd, "Python [venv env:two]", metadata={"venv_source": "venv"}
+        )
+        m = self._make_manager(
+            monkeypatch,
+            system_specs={"mykern": rd},
+            venv_specs={"venv-one-py": first, "venv-two-py": second},
+        )
+        # Pre-fix this raised KeyError('mykern') and 500'd /api/kernelspecs
+        specs = m.find_kernel_specs()
+        assert "mykern" not in specs
+        assert "venv-one-py" in specs
+        assert "venv-two-py" in specs
 
 
 class TestNameConflictResolution:

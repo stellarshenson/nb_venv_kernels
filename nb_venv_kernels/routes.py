@@ -140,8 +140,7 @@ class RefreshHandler(APIHandler):
     def post(self):
         manager = get_venv_manager(self)
         # Invalidate the cache so next request rebuilds kernel list
-        manager._venv_kernels_cache = None
-        manager._venv_kernels_cache_expiry = None
+        manager.invalidate_cache()
         self.finish(json.dumps({"refreshed": True}))
 
 
