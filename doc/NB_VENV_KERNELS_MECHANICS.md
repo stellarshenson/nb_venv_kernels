@@ -312,10 +312,10 @@ All registry operations use file locking via the `filelock` package (cross-platf
 
 Two pieces of derived state, both owned by `invalidate_cache()`:
 
-| State                     | TTL                  | Contents                                        |
-| ------------------------- | -------------------- | ----------------------------------------------- |
-| `_venv_kernels_cache`     | 60s                  | Processed KernelSpec objects                    |
-| `_default_name_overrides` | rebuilt each listing | Default names collapsed onto conda/venv specs   |
+| State                     | TTL                  | Contents                                      |
+| ------------------------- | -------------------- | --------------------------------------------- |
+| `_venv_kernels_cache`     | 60s                  | Processed KernelSpec objects                  |
+| `_default_name_overrides` | rebuilt each listing | Default names collapsed onto conda/venv specs |
 
 `_default_name_overrides` uses a `None` sentinel for "never computed";
 `get_kernel_spec()` repopulates it via a fresh listing on a cold start or

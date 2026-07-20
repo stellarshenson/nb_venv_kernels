@@ -2,6 +2,19 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.45
+
+### Fixed
+
+- One environment now renders one kernel tile - a conda or venv environment that also has an on-disk default kernelspec no longer appears twice (`Python [conda env:base] *` alongside a bare `Python 3`)
+- `find_kernel_specs()` keeps the default `python3`/`python2`/`ir` name in the listing (so standard notebooks still bind a kernel) but collapses the matching conda/venv alias onto it; `get_kernel_spec()` then serves the environment-labelled spec under the default name
+- Alias names stay individually resolvable, and paths are compared via `os.path.realpath` so symlinked environment prefixes collapse correctly
+
+### Changed
+
+- Cache invalidation consolidated behind a single `invalidate_cache()` method used by the scan, register, unregister and refresh paths
+- Imported canonical Makefile v1.34 (build formats lockfiles with `jlpm prettier`; `node_modules` is self-healing on a fresh checkout)
+
 ## 1.2.44
 
 ### Maintenance

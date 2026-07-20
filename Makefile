@@ -1,5 +1,11 @@
-# Makefile for Jupyterlab extensions version 1.32
+# Makefile for Jupyterlab extensions version 1.34
 # changelog:
+#   1.34 - build formats the lockfiles with `jlpm prettier` (the project's pinned
+#          toolchain) instead of `npx prettier`, which fails with "prettier: Permission
+#          denied" against a yarn-berry node_modules where the .cjs lacks the exec bit
+#   1.33 - check_dependencies now also treats a missing/empty node_modules as a missing
+#          dependency, and install_dependencies runs `jlpm install` to populate it, so
+#          `make install`/`test` self-heal a fresh env without needing a full build first
 #   1.32 - use a project-local nodeenv at .nodeenv/ instead of overwriting the python
 #          prefix via `nodeenv -p` (which used to fail with "Text file busy" when the
 #          existing node binary was held open). PATH=.nodeenv/bin:$PATH is exported so
@@ -38,7 +44,7 @@ increment_version:
 build: clean increment_version check_dependencies
 	npm install
 	jlpm install
-	npx prettier --write package-lock.json package.json
+	jlpm prettier
 	python -m build
 
 ## install package
@@ -67,6 +73,7 @@ check_dependencies:
 	[ -x "$(NODEENV)/bin/npm" ] || MISSING="$$MISSING npm"; \
 	[ -x "$(NODEENV)/bin/yarn" ] || MISSING="$$MISSING yarn"; \
 	python -m twine --version >/dev/null 2>&1 || MISSING="$$MISSING twine"; \
+	{ [ -d node_modules ] && [ -n "$$(ls -A node_modules 2>/dev/null)" ]; } || MISSING="$$MISSING node_modules"; \
 	if [ -n "$$MISSING" ]; then \
 		echo "Missing dependencies:$$MISSING"; \
 		echo "Installing missing dependencies..."; \
@@ -97,6 +104,10 @@ install_dependencies:
 	@if [ ! -x "$(NODEENV)/bin/yarn" ]; then \
 		echo "Installing yarn + rimraf into $(NODEENV)..."; \
 		"$(NODEENV)/bin/npm" install -g yarn rimraf; \
+	fi
+	@if [ ! -d node_modules ] || [ -z "$$(ls -A node_modules 2>/dev/null)" ]; then \
+		echo "Installing project node_modules (jlpm install)..."; \
+		jlpm install; \
 	fi
 	@echo "node:  $$($(NODEENV)/bin/node --version 2>/dev/null) ($(NODEENV)/bin/node)"
 	@echo "npm:   $$($(NODEENV)/bin/npm --version 2>/dev/null)"
