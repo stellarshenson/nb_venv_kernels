@@ -13,6 +13,7 @@ from nb_venv_kernels.registry import (
     register_environment,
     unregister_environment,
     is_uv_environment,
+    env_display_name,
 )
 
 
@@ -134,7 +135,7 @@ class TestVenvKernelDiscovery:
 
         # Verify structure
         assert spec.language.lower() == "python"
-        assert "python" in spec.argv[0].lower()
+        assert spec.argv[0] == os.path.join(venv_path, "bin", "python")
         assert spec.env.get("VIRTUAL_ENV") == venv_path
 
         # Cleanup
@@ -283,8 +284,8 @@ class TestCondaKernelDiscovery:
         dups = {rd: names for rd, names in by_rd.items() if len(names) > 1}
         assert not dups, f"one environment must render one listing entry, got: {dups}"
 
-    def test_get_conda_env_name_base_installations(self, manager):
-        """Test _get_conda_env_name returns 'base' for conda base installations."""
+    def test_get_conda_env_name_base_installations(self):
+        """Test env_display_name returns 'base' for conda base installations."""
         base_paths = [
             "/opt/conda",
             "/home/user/anaconda3",
@@ -294,17 +295,17 @@ class TestCondaKernelDiscovery:
             "/home/user/mambaforge",
         ]
         for path in base_paths:
-            assert manager._get_conda_env_name(path) == "base", f"Expected 'base' for {path}"
+            assert env_display_name(path, "conda") == "base", f"Expected 'base' for {path}"
 
-    def test_get_conda_env_name_named_envs(self, manager):
-        """Test _get_conda_env_name returns directory name for named envs."""
+    def test_get_conda_env_name_named_envs(self):
+        """Test env_display_name returns directory name for named envs."""
         named_paths = [
             ("/opt/conda/envs/myenv", "myenv"),
             ("/home/user/anaconda3/envs/data-science", "data-science"),
             ("/home/user/.conda/envs/test-env", "test-env"),
         ]
         for path, expected in named_paths:
-            assert manager._get_conda_env_name(path) == expected, f"Expected '{expected}' for {path}"
+            assert env_display_name(path, "conda") == expected, f"Expected '{expected}' for {path}"
 
 
 class TestMixedEnvironments:
@@ -888,3 +889,142 @@ class TestNameConflictResolution:
         assert result[1]["path"] == "/b"
         assert result[1]["type"] == "uv"
         assert result[1]["exists"] is False
+
+
+def _fake_env(root, rel_path):
+    """Create a minimal registrable env: bin/python plus a python3 kernel.json."""
+    import json
+    import sys
+
+    env_path = os.path.join(root, rel_path)
+    os.makedirs(os.path.join(env_path, "bin"))
+    os.symlink(sys.executable, os.path.join(env_path, "bin", "python"))
+    kernel_dir = os.path.join(env_path, "share", "jupyter", "kernels", "python3")
+    os.makedirs(kernel_dir)
+    with open(os.path.join(kernel_dir, "kernel.json"), "w") as f:
+        json.dump({
+            "argv": ["python", "-m", "ipykernel_launcher", "-f", "{connection_file}"],
+            "display_name": "Python 3 (ipykernel)",
+            "language": "python",
+        }, f)
+    return env_path
+
+
+def _venv_display_names(manager, env_path):
+    """Display names of the venv kernels the manager lists for one env."""
+    manager.invalidate_cache()
+    return [
+        manager.get_kernel_spec(name).display_name
+        for name in manager.find_kernel_specs()
+        if name.startswith("venv-")
+        and manager.get_kernel_spec(name).metadata.get("venv_env_path") == env_path
+    ]
+
+
+class TestEnvNaming:
+    """One naming rule for kernels and the environment listing."""
+
+    @pytest.mark.parametrize("folder", ["venv", ".env", "env", ".venv"])
+    def test_env_folder_takes_project_name(self, temp_dir, folder):
+        """myproj/<folder> is named myproj in the listing and the kernel picker."""
+        env_path = _fake_env(temp_dir, os.path.join("myproj", folder))
+        register_environment(env_path)
+        try:
+            m = VEnvKernelSpecManager(venv_only=True)
+            listed = [e["name"] for e in m.list_environments() if e["path"] == env_path]
+            assert listed == ["myproj"]
+            assert _venv_display_names(m, env_path) == ["Python [venv env:myproj]"]
+        finally:
+            unregister_environment(env_path)
+
+    def test_current_env_marked(self, temp_dir, monkeypatch):
+        """The env the server runs in gets ' *' appended to its display name."""
+        import sys
+
+        env_path = _fake_env(temp_dir, os.path.join("current", ".venv"))
+        monkeypatch.setattr(sys, "prefix", env_path)
+        register_environment(env_path)
+        try:
+            m = VEnvKernelSpecManager(venv_only=True)
+            assert _venv_display_names(m, env_path) == ["Python [venv env:current] *"]
+        finally:
+            unregister_environment(env_path)
+
+    def test_deleted_env_lists_no_kernel(self, temp_dir):
+        """A registered env whose folder is gone lists no kernel and raises nothing."""
+        env_path = _fake_env(temp_dir, os.path.join("gone", ".venv"))
+        register_environment(env_path)
+        try:
+            m = VEnvKernelSpecManager(venv_only=True)
+            assert len(_venv_display_names(m, env_path)) == 1
+            shutil.rmtree(os.path.join(temp_dir, "gone"))
+            assert _venv_display_names(m, env_path) == []
+        finally:
+            unregister_environment(env_path)
+
+
+class TestConfigTraits:
+    """env_filter and name_format traits."""
+
+    def test_env_filter_excludes_matching_path(self, temp_dir):
+        keep = _fake_env(temp_dir, os.path.join("keepme", ".venv"))
+        skip = _fake_env(temp_dir, os.path.join("skipme", ".venv"))
+        register_environment(keep)
+        register_environment(skip)
+        try:
+            m = VEnvKernelSpecManager(venv_only=True, env_filter="skipme")
+            assert len(_venv_display_names(m, keep)) == 1
+            assert _venv_display_names(m, skip) == []
+        finally:
+            unregister_environment(keep)
+            unregister_environment(skip)
+
+    @pytest.mark.parametrize("env_filter", [None, "/a/"])
+    def test_listing_names_match_picker(self, temp_dir, env_filter):
+        """Every env with a kernel tile carries the same name in the listing."""
+        paths = [_fake_env(temp_dir, os.path.join(d, "app", ".venv")) for d in ("a", "b")]
+        for p in paths:
+            register_environment(p)
+        try:
+            m = VEnvKernelSpecManager(venv_only=True, env_filter=env_filter)
+            listed = {e["path"]: e["name"] for e in m.list_environments()}
+            tiles = 0
+            for p in paths:
+                for display in _venv_display_names(m, p):
+                    assert display == f"Python [venv env:{listed[p]}]"
+                    tiles += 1
+            assert tiles == (1 if env_filter else 2)
+        finally:
+            for p in paths:
+                unregister_environment(p)
+
+    def test_name_format_sets_display_name(self, temp_dir):
+        env_path = _fake_env(temp_dir, os.path.join("myproj", ".venv"))
+        register_environment(env_path)
+        try:
+            m = VEnvKernelSpecManager(venv_only=True, name_format="{environment} ({source})")
+            assert _venv_display_names(m, env_path) == ["myproj (venv)"]
+        finally:
+            unregister_environment(env_path)
+
+
+def test_listing_sort_order(monkeypatch):
+    """Current env first, then conda, uv, venv, then system kernels."""
+    h = TestDefaultKernelDedup()
+    rd = "/fake/{}/share/jupyter/kernels/python3".format
+    m = h._make_manager(
+        monkeypatch,
+        system_specs={"ir": rd("system")},
+        conda_specs={"conda-env-x-py": h._make_spec(rd("conda"), "Python [conda env:x]")},
+        venv_specs={
+            "venv-v-py": h._make_spec(rd("v"), "Python [venv env:v]", {"venv_source": "venv"}),
+            "venv-u-py": h._make_spec(rd("u"), "Python [uv env:u]", {"venv_source": "uv"}),
+            "venv-cur-py": h._make_spec(
+                rd("cur"), "Python [venv env:cur] *",
+                {"venv_source": "venv", "venv_is_currently_running": True},
+            ),
+        },
+    )
+    assert list(m.find_kernel_specs()) == [
+        "venv-cur-py", "conda-env-x-py", "venv-u-py", "venv-v-py", "ir",
+    ]

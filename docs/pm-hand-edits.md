@@ -1,0 +1,1 @@
+- 2026-09-29T12:58:52Z @kj defects.md f26af24d sha256:64c38b4434ff37a1f377be52308fd509cc529da82d4d6c5e2ef9e0be79f3a4d8: legacy layout: fold each ### DEF-N heading into its item line and add the ## category heading, which upgrade cannot restructure itself

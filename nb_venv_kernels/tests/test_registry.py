@@ -26,7 +26,7 @@ from nb_venv_kernels.registry import (
     update_name_cache,
     prune_name_cache,
     remove_name_cache,
-    _derive_env_name,
+    env_display_name,
 )
 
 
@@ -106,7 +106,7 @@ class TestEnvironmentRegistration:
 
     def test_register_invalid_path(self):
         """Test registering an invalid path."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Environment path does not exist"):
             register_environment("/nonexistent/path/to/venv")
 
     def test_register_non_venv_directory(self, temp_dir):
@@ -114,7 +114,7 @@ class TestEnvironmentRegistration:
         non_venv = os.path.join(temp_dir, "not-a-venv")
         os.makedirs(non_venv)
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Not a valid Python environment"):
             register_environment(non_venv)
 
     def test_register_venv_without_kernelspec_allowed_by_default(self, temp_dir):
@@ -154,9 +154,27 @@ class TestEnvironmentRegistration:
         registered2, updated2 = register_environment(venv_path)
         assert registered2 is False
         assert updated2 is False
+        assert read_environments().count(venv_path) == 1
 
         # Cleanup
         unregister_environment(venv_path)
+
+    def test_name_taken_gets_suffix(self, temp_dir):
+        """A custom name already in use is stored with a _1 suffix."""
+        first = os.path.join(temp_dir, "first", ".venv")
+        second = os.path.join(temp_dir, "second", ".venv")
+        for path in (first, second):
+            subprocess.run(["python", "-m", "venv", "--without-pip", path],
+                           check=True, capture_output=True)
+        try:
+            register_environment(first, name="same-name")
+            register_environment(second, name="same-name")
+            names = dict(read_environments_with_names())
+            assert names[first] == "same-name"
+            assert names[second] == "same-name_1"
+        finally:
+            unregister_environment(first)
+            unregister_environment(second)
 
     def test_register_with_custom_name(self, temp_dir):
         """Test registering an environment with a custom name."""
@@ -444,6 +462,19 @@ class TestDirectoryScanning:
         # Cleanup
         unregister_environment(venv_path)
 
+    def test_scan_removes_deleted_env(self, temp_dir):
+        """scan drops a registered env whose folder is gone and reports it."""
+        venv_path = os.path.join(temp_dir, "gone-project", ".venv")
+        subprocess.run(["python", "-m", "venv", "--without-pip", venv_path],
+                       check=True, capture_output=True)
+        register_environment(venv_path)
+        shutil.rmtree(os.path.dirname(venv_path))
+
+        result = scan_directory(temp_dir, max_depth=2)
+
+        assert _path_in_result(venv_path, result["not_available"])
+        assert venv_path not in read_environments()
+
     def test_scan_dry_run(self, temp_dir):
         """Test that dry_run does not modify registry."""
         project_dir = os.path.join(temp_dir, "dry-run-project")
@@ -728,10 +759,14 @@ class TestNameCache:
         result = get_cached_name("/nonexistent/path")
         assert result is None
 
-    def test_derive_env_name(self):
+    def test_env_display_name(self):
         """Test deriving default name from path."""
-        assert _derive_env_name("/home/user/projects/myproject/.venv") == "myproject"
-        assert _derive_env_name("/home/user/myapp/venv") == "myapp"
+        assert env_display_name("/home/user/projects/myproject/.venv") == "myproject"
+        assert env_display_name("/home/user/myapp/venv") == "myapp"
+        assert env_display_name("/home/user/envs/ml") == "ml"
+        assert env_display_name("/opt/miniconda3", "conda") == "base"
+        assert env_display_name("/opt/conda/envs/venv", "conda") == "venv"
+        assert env_display_name("/home/user/myapp/.venv", custom_name="mine") == "mine"
 
     def test_register_updates_cache_with_custom_name(self, temp_dir):
         """Test that registration with custom name updates the cache."""

@@ -2,6 +2,24 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## 1.2.46
+
+### Fixed
+
+- The scan results dialog escapes environment names, paths, types and actions; before, a folder name containing HTML could run script in JupyterLab
+- One naming rule for environments: an environment in `myproj/venv` is named `myproj` in the kernel picker and in `nb_venv_kernels list`, where before the picker showed `venv`
+- A custom `name_format` containing `{source}` no longer crashes conda environment discovery
+- `nb_venv_kernels --help` states the real default scan depth (10, not 7)
+- `nb_venv_kernels list` sorts local conda environments after global conda and before uv and venv
+- The test suite no longer changes the registries or the name cache in the home directory of the user who runs it
+
+### Changed
+
+- Kernels of environments in `venv` or `env` folders are named after the parent folder (`venv-venv-python3` becomes `venv-myproj-python3`); a notebook saved with the old kernel name asks for a kernel once
+- Frontend build moved from webpack to `@jupyter/builder` (Rspack) with eslint 9, from extension template 4.6.5
+- Dependency floors raised: JupyterLab 4.6, `jupyter_server>=2.21,<3`, Python 3.10 or later
+- Imported canonical Makefile v1.43: `make test` runs jest, pytest and the endpoint authentication check
+
 ## 1.2.45
 
 ### Fixed

@@ -72,7 +72,7 @@ Tests for VEnvKernelSpecManager kernel discovery functionality.
 **TestMixedEnvironments**
 
 - `test_multiple_environments` - Creates and discovers multiple venvs simultaneously
-- `test_environment_without_ipykernel` - Verifies environments without ipykernel are not discovered
+- `test_environment_without_ipykernel_registers_by_default` - Environments without ipykernel are registered by default
 
 **TestKernelSpecDetails**
 
@@ -106,7 +106,7 @@ Tests for environment registration and registry management.
 
 **TestDirectoryScanning**
 
-- `test_scan_finds_venvs` - Scan discovers venv in nested directory
+- `test_scan_finds_venvs_with_kernel` - Scan discovers venv in nested directory
 - `test_scan_depth_limit` - Scan respects max_depth parameter
 - `test_scan_registers_environments` - Scan without dry_run registers found environments
 - `test_scan_dry_run` - dry_run does not modify registry

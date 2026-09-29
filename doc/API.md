@@ -63,7 +63,7 @@ Scan directory for environments and register them.
 **Parameters:**
 
 - `path` - Directory to scan (default: server working directory)
-- `depth` - Maximum recursion depth (default: from server config, usually 7)
+- `depth` - Maximum recursion depth (default: `scan_depth`, 10)
 - `dry_run` - If true, report without making changes (default: false)
 
 **Response:**
@@ -223,7 +223,7 @@ All commands support `--json` flag for machine-readable output.
 nb_venv_kernels list --json
 
 # Scan with JSON output (no spinner or text)
-nb_venv_kernels scan /path/to/workspace --json
+nb_venv_kernels scan --path /path/to/workspace --json
 
 # Register with JSON output
 nb_venv_kernels register /path/to/.venv --json
@@ -234,7 +234,7 @@ nb_venv_kernels register /path/to/.venv --json
 The scan command supports `--dry-run` flag to preview changes without modifying registries.
 
 ```bash
-nb_venv_kernels scan /path/to/workspace --dry-run
+nb_venv_kernels scan --path /path/to/workspace --dry-run
 ```
 
 ## JupyterLab Integration

@@ -5,3 +5,5 @@ node_modules
 !/package.json
 nb_venv_kernels
 .claude
+eslint.config.mjs
+.venv

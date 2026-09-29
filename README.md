@@ -67,9 +67,9 @@ pip install ipykernel
 Scan a directory tree to find and register all venv/uv environments:
 
 ```bash
-nb_venv_kernels scan                      # Scan current directory
-nb_venv_kernels scan /path/to/projects    # Scan specific directory
-nb_venv_kernels scan --depth 3            # Limit recursion depth (default: 5)
+nb_venv_kernels scan                           # Scan the workspace root
+nb_venv_kernels scan --path /path/to/projects  # Scan specific directory
+nb_venv_kernels scan --depth 3                 # Limit recursion depth (default: 10)
 ```
 
 The scan command automatically:
@@ -107,7 +107,7 @@ my-project                uv               yes      yes      /home/user/my-proje
 another-project           venv             yes      no       /home/user/another-project/venv
 ```
 
-Environments are sorted by type (conda, uv, venv) then by name. The KERNEL column indicates whether `ipykernel` is installed. Missing environments and kernels display "no" in red. Duplicate names are automatically resolved with `_1`, `_2` suffixes.
+Environments are sorted by type (conda, uv, venv) then by name. The KERNEL column indicates whether `ipykernel` is installed. Missing environments and kernels display "no" in red.
 
 ### Jupyter Configuration
 

@@ -178,7 +178,7 @@ def refresh_name_cache() -> List[Dict[str, str]]:
                                                               include_missing=True,
                                                               include_names=True):
                 # Determine the name to use
-                name = custom_name if custom_name else _derive_env_name(env_path)
+                name = custom_name if custom_name else env_display_name(env_path)
 
                 # Add/update if not in cache or name differs
                 if env_path not in cache or cache[env_path] != name:
@@ -447,21 +447,37 @@ def _make_unique_name(name: str, existing_names: set) -> str:
     return f"{name}_{suffix}"
 
 
-def _derive_env_name(env_path: str) -> str:
-    """Derive a default name from an environment path.
+# Folder names a venv is conventionally created under; such an env is named
+# after its project (parent) folder instead.
+VENV_DIR_NAMES = (".venv", "venv", ".env", "env", ".virtualenv", "virtualenv")
 
-    Uses the parent directory name (project folder) as the default name.
-    For paths like /home/user/projects/myproject/.venv -> "myproject"
+# Folder names of a conda base installation.
+CONDA_BASE_DIR_NAMES = {"conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
+                        "miniforge", "miniforge3", "mambaforge", "mambaforge3"}
 
-    Args:
-        env_path: Absolute path to the environment.
 
-    Returns:
-        Derived name string.
+def is_conda_base_dir(env_path: str) -> bool:
+    """Check if a path's folder name is that of a conda base installation."""
+    return os.path.basename(os.path.abspath(env_path)).lower() in CONDA_BASE_DIR_NAMES
+
+
+def env_display_name(env_path: str, env_type: str = "venv",
+                     custom_name: Optional[str] = None) -> str:
+    """Name an environment - the one rule shared by kernels, listing, scan and CLI.
+
+    A custom name wins. A conda base installation is "base". A venv/uv env in a
+    conventional folder (.venv, venv, ...) takes its project folder's name, e.g.
+    /home/user/myproject/.venv -> "myproject". Anything else keeps its folder name.
     """
+    if custom_name:
+        return custom_name
     env_path = os.path.abspath(env_path)
-    parent = os.path.dirname(env_path)
-    return os.path.basename(parent)
+    env_dir = os.path.basename(env_path)
+    if env_type == "conda":
+        return "base" if is_conda_base_dir(env_path) else env_dir
+    if env_dir in VENV_DIR_NAMES:
+        return os.path.basename(os.path.dirname(env_path))
+    return env_dir
 
 
 def _has_kernelspec(env_path: str) -> bool:
@@ -580,7 +596,7 @@ def register_environment(env_path: str, name: Optional[str] = None,
                 f.write(env_path + "\n")
 
         # Update name cache - use final_name or derive from path
-        cache_name = final_name if final_name else _derive_env_name(env_path)
+        cache_name = final_name if final_name else env_display_name(env_path)
         update_name_cache(env_path, cache_name)
 
         return (True, False)  # Newly registered
@@ -974,10 +990,7 @@ def is_global_conda_environment(path: str) -> bool:
     abs_path = os.path.abspath(path)
 
     # Check if it's a known conda base installation
-    basename = os.path.basename(abs_path).lower()
-    base_names = {"conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
-                  "miniforge", "miniforge3", "mambaforge", "mambaforge3"}
-    if basename in base_names:
+    if is_conda_base_dir(abs_path):
         return True
 
     # Check if it's listed in conda's known environments
@@ -1061,16 +1074,16 @@ def scan_directory(root_path: str, max_depth: int = 10,
         has_kernel = _has_kernelspec(full_path)
         if require_kernelspec and not has_kernel:
             # Only ignore if require_kernelspec is True
-            env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+            env_name = get_cached_name(full_path) or env_display_name(full_path)
             ignore.append({"path": full_path, "name": env_name})
         elif dry_run:
             # In dry run, check if already registered
             existing = read_environments_with_names()
             existing_dict = {p: n for p, n in existing}
             if full_path in existing_dict:
-                skipped.append({"path": full_path, "name": existing_dict[full_path] or _derive_env_name(full_path)})
+                skipped.append({"path": full_path, "name": existing_dict[full_path] or env_display_name(full_path)})
             else:
-                env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                env_name = get_cached_name(full_path) or env_display_name(full_path)
                 registered.append({"path": full_path, "name": env_name})
         else:
             # Try to register - use cached name if available
@@ -1081,7 +1094,7 @@ def scan_directory(root_path: str, max_depth: int = 10,
                     require_kernelspec=require_kernelspec
                 )
                 # Get the final name from cache (updated by register_environment)
-                final_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                final_name = get_cached_name(full_path) or env_display_name(full_path)
                 if was_registered:
                     registered.append({"path": full_path, "name": final_name})
                 elif was_updated:
@@ -1090,7 +1103,7 @@ def scan_directory(root_path: str, max_depth: int = 10,
                     skipped.append({"path": full_path, "name": final_name})
             except ValueError:
                 # Only happens if require_kernelspec=True and no kernel
-                env_name = get_cached_name(full_path) or _derive_env_name(full_path)
+                env_name = get_cached_name(full_path) or env_display_name(full_path)
                 ignore.append({"path": full_path, "name": env_name})
 
     def scan_recursive(current_path: str, depth: int):

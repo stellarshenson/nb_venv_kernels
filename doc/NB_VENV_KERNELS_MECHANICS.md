@@ -59,7 +59,7 @@ nb_venv_kernels register /path/to/.venv
 nb_venv_kernels register /path/to/.venv -n "My Project"  # With custom name
 
 # Directory scanning
-nb_venv_kernels scan /path/to/projects
+nb_venv_kernels scan --path /path/to/projects
 ```
 
 Re-registering an existing environment with a different name updates the custom name in the registry.
@@ -82,20 +82,20 @@ def is_uv_environment(env_path: str) -> bool:
 The `_all_envs()` method reads both registry files:
 
 ```python
-for env_path in read_environments():
+for env_path, custom_name in read_environments_with_names():
     # Apply filter if configured
     if self.env_filter and self._env_filter_regex.search(env_path):
         continue
 
-    # Derive environment name from path
-    env_dir = basename(env_path)
-    if env_dir == ".venv":
-        env_name = basename(dirname(env_path))  # Use project name
-    else:
-        env_name = env_dir
+    env_name = env_display_name(env_path, custom_name=custom_name)
+
+    # Handle duplicates by appending _1, _2, etc.
+    ...
 
     all_envs[env_name] = env_path
 ```
+
+`env_display_name()` in `registry.py` is the one naming rule: a custom name wins, and a venv/uv env in a folder named `.venv`, `venv`, `.env`, `env`, `.virtualenv` or `virtualenv` takes its parent folder's name.
 
 Registry file format (plain text with optional tab-separated custom names):
 
@@ -355,7 +355,7 @@ This prevents registration of arbitrary system paths while allowing legitimate c
 | `venv_only`   | False                                     | Show only venv kernels, hide system and conda kernels |
 | `env_filter`  | None                                      | Regex to exclude environments by path                 |
 | `name_format` | `{language} [{source} env:{environment}]` | Display name template                                 |
-| `scan_depth`  | 7                                         | Default depth for scan command                        |
+| `scan_depth`  | 10                                        | Default depth for scan command                        |
 
 ## Why Standard Jupyter Doesn't See These Kernels
 

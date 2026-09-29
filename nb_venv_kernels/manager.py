@@ -32,6 +32,8 @@ from .registry import (
     unregister_environment,
     _check_has_kernel,
     get_conda_environments,
+    env_display_name,
+    is_conda_base_dir,
 )
 
 CACHE_TIMEOUT = 60
@@ -173,7 +175,9 @@ class VEnvKernelSpecManager(KernelSpecManager):
         # Create separate CondaKernelSpecManager instance for conda kernels
         self._conda_manager = None
         if _HAS_CONDA:
-            self._conda_manager = CondaKernelSpecManager(**kwargs)
+            # parent=self shares the config and log; this manager's own traits
+            # (name_format with {source}, venv_only, ...) must not reach it
+            self._conda_manager = CondaKernelSpecManager(parent=self)
 
         if self.env_filter is not None:
             self._env_filter_regex = re.compile(self.env_filter)
@@ -206,16 +210,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
             if self.env_filter and self._env_filter_regex.search(env_path):
                 continue
 
-            # Use custom name if available, otherwise derive from path
-            if custom_name:
-                env_name = custom_name
-            else:
-                # Use parent directory name if .venv, otherwise use directory name
-                env_dir = basename(env_path)
-                if env_dir == ".venv":
-                    env_name = basename(dirname(env_path))
-                else:
-                    env_name = env_dir
+            env_name = env_display_name(env_path, custom_name=custom_name)
 
             # Handle duplicates by appending _1, _2, etc.
             if env_name in seen_names:
@@ -592,19 +587,6 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 seen_names[name] = 1
         return environments
 
-    def _get_conda_env_name(self, env_path: str) -> str:
-        """Get display name for conda environment.
-
-        Returns 'base' for conda base installations, otherwise the directory name.
-        """
-        env_dir = basename(env_path)
-        if env_dir.lower() in (
-            "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
-            "miniforge", "miniforge3", "mambaforge", "mambaforge3"
-        ):
-            return "base"
-        return env_dir
-
     def list_environments(self):
         """List all registered environments with their status.
 
@@ -613,6 +595,9 @@ class VEnvKernelSpecManager(KernelSpecManager):
         """
         envs = _list_environments()
 
+        # The kernel picker's names, so one env has one name everywhere
+        picker_names = {p: n for n, p in self._all_envs().items()}
+
         # Add display name
         result = []
         for env in envs:
@@ -620,30 +605,11 @@ class VEnvKernelSpecManager(KernelSpecManager):
             path = env["path"]
             custom_name = env.get("custom_name")
 
-            # Use custom name if provided, otherwise derive from path
-            if custom_name:
-                name = custom_name
-            else:
-                env_dir = basename(path)
-                if env_dir in (".venv", "venv", ".env", "env"):
-                    name = basename(dirname(path))
-                elif env_type == "conda" and env_dir.lower() in (
-                    "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
-                    "miniforge", "miniforge3", "mambaforge", "mambaforge3"
-                ):
-                    name = "base"
-                else:
-                    name = env_dir
+            name = picker_names.get(path) or env_display_name(path, env_type, custom_name)
 
             # Determine type display
             if env_type == "conda":
-                if basename(path).lower() in (
-                    "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
-                    "miniforge", "miniforge3", "mambaforge", "mambaforge3"
-                ):
-                    type_display = "conda"
-                else:
-                    type_display = "conda (local)"
+                type_display = "conda" if is_conda_base_dir(path) else "conda (local)"
             else:
                 type_display = env_type
 
@@ -656,7 +622,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
                 "custom_name": custom_name,
             })
 
-        return self._resolve_name_conflicts(result)
+        return result
 
     def scan_environments(self, path=".", max_depth=None, dry_run=False):
         """Scan directory for environments and register them.
@@ -728,7 +694,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
             seen_paths.add(env_path)
 
         for env_path in result["conda_found"]:
-            env_name = self._get_conda_env_name(env_path)
+            env_name = env_display_name(env_path, "conda")
             environments.append(get_env_info(env_path, "conda", "keep", env_name, exists=True))
             seen_paths.add(env_path)
 
@@ -736,7 +702,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
         global_conda_count = 0
         for env_path in get_conda_environments():
             if env_path not in seen_paths:
-                env_name = self._get_conda_env_name(env_path)
+                env_name = env_display_name(env_path, "conda")
                 environments.append(get_env_info(env_path, "conda", "keep", env_name))
                 global_conda_count += 1
 
@@ -766,7 +732,7 @@ class VEnvKernelSpecManager(KernelSpecManager):
 
         for item in result["not_available"]:
             custom_name = item.get("custom_name")
-            env_name = custom_name or self._get_env_display_name(item["path"], item["type"])
+            env_name = env_display_name(item["path"], item["type"], custom_name)
             environments.append({
                 "action": "remove",
                 "name": env_name,
@@ -832,26 +798,3 @@ class VEnvKernelSpecManager(KernelSpecManager):
             # Invalidate cache
             self.invalidate_cache()
         return {"path": path, "unregistered": unregistered}
-
-    def _get_env_display_name(self, env_path, env_type, custom_name=None):
-        """Get display name for an environment."""
-        # Use custom name if provided
-        if custom_name:
-            return custom_name
-
-        env_dir = basename(env_path)
-
-        if env_type in ("venv", "uv"):
-            if env_dir in (".venv", "venv", ".env", "env", ".virtualenv", "virtualenv"):
-                return basename(dirname(env_path))
-            return env_dir
-
-        if env_type == "conda":
-            if env_dir.lower() in (
-                "conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
-                "miniforge", "miniforge3", "mambaforge", "mambaforge3"
-            ):
-                return "base"
-            return env_dir
-
-        return env_dir

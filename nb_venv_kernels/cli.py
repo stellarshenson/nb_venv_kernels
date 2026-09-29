@@ -16,12 +16,17 @@ from .manager import (
 )
 from .registry import (
     is_global_conda_environment,
+    is_conda_base_dir,
     get_name_cache_path,
     load_name_cache,
     prune_name_cache,
     refresh_name_cache,
     remove_name_cache,
 )
+
+
+# The scan depth the CLI uses when --depth is not given
+DEFAULT_SCAN_DEPTH = VEnvKernelSpecManager.scan_depth.default_value
 
 
 class Colors:
@@ -100,48 +105,10 @@ class Spinner:
             print(final_message)
 
 
-def _is_conda_global(env_path: str) -> bool:
-    """Check if conda environment is global (base installation)."""
-    basename = os.path.basename(env_path).lower()
-    base_names = {"conda", "anaconda", "anaconda3", "miniconda", "miniconda3",
-                  "miniforge", "miniforge3", "mambaforge", "mambaforge3"}
-    return basename in base_names
-
-
-def _get_env_display_name(env_path: str, env_type: str, custom_name: str = None) -> str:
-    """Get display name for an environment.
-
-    Priority:
-    1. Custom name if provided
-    2. For venv/uv: parent directory name (project name)
-    3. For conda base: 'base'
-    4. For conda envs: the env directory name
-    """
-    # Use custom name if provided (venv/uv only)
-    if custom_name:
-        return custom_name
-
-    basename = os.path.basename(env_path)
-
-    # For venv/uv, common venv folder names -> use parent (project) name
-    if env_type in ("venv", "uv"):
-        if basename in (".venv", "venv", ".env", "env", ".virtualenv", "virtualenv"):
-            return os.path.basename(os.path.dirname(env_path))
-        return basename
-
-    # For conda
-    if env_type == "conda":
-        if _is_conda_global(env_path):
-            return "base"
-        return basename
-
-    return basename
-
-
 def _get_env_type_display(env_path: str, env_type: str) -> str:
     """Get display type for an environment."""
     if env_type == "conda":
-        if _is_conda_global(env_path):
+        if is_conda_base_dir(env_path):
             return "conda"
         return "conda (local)"
     return env_type
@@ -330,7 +297,7 @@ def remove_jupyter_config(config_dir=None):
 
 def print_help():
     """Print rich help output."""
-    print("""nb_venv_kernels - Jupyter kernel discovery for uv/venv environments
+    print(f"""nb_venv_kernels - Jupyter kernel discovery for uv/venv environments
 
 Usage:
   nb_venv_kernels <command> [options]
@@ -351,7 +318,7 @@ Commands:
 Options:
   register -n NAME    Custom display name for the environment
   scan --path PATH    Directory to scan (default: workspace root)
-  scan --depth N      Maximum directory depth to scan (default: 7)
+  scan --depth N      Maximum directory depth to scan (default: {DEFAULT_SCAN_DEPTH})
   scan --dry-run      Dry run: scan and report without changes
   cache --json        Output entries in JSON format
 
@@ -457,7 +424,7 @@ def main():
         "--depth",
         type=int,
         default=None,
-        help="Maximum directory depth to scan (default: from config, usually 7)",
+        help=f"Maximum directory depth to scan (default: {DEFAULT_SCAN_DEPTH})",
     )
     scan_parser.add_argument(
         "--dry-run",
@@ -588,17 +555,10 @@ def main():
         envs = manager.list_environments()
 
         # Sort: conda global first, then conda local, uv, venv; by name within each
+        type_order = {"conda": 0, "conda (local)": 1, "uv": 2}
+
         def sort_key(e):
-            env_type = e.get("type", "venv")
-            name = e["name"].lower()  # Use manager's name (has conflict resolution)
-            if env_type == "conda":
-                if _is_conda_global(e["path"]):
-                    return (0, name)  # conda global first
-                return (1, name)  # conda local
-            elif env_type == "uv":
-                return (2, name)
-            else:
-                return (3, name)  # venv
+            return (type_order.get(e.get("type", "venv"), 3), e["name"].lower())
 
         envs.sort(key=sort_key)
 
@@ -609,7 +569,7 @@ def main():
             output = []
             for env in envs:
                 output.append({
-                    "name": env["name"],  # Use name from manager (has conflict resolution)
+                    "name": env["name"],  # Use name from manager
                     "custom_name": env.get("custom_name"),
                     "type": _get_env_type_display(env['path'], env.get("type", "venv")),
                     "exists": env["exists"],
@@ -625,12 +585,12 @@ def main():
             print(f"{'name':<30} {'type':<16} {'exists':<8} {'kernel':<8} {'path (relative to workspace)'}")
             print("-" * 110)
             for env in envs:
-                name = env["name"]  # Use name from manager (has conflict resolution)
+                name = env["name"]  # Use name from manager
                 env_type = _get_env_type_display(env['path'], env.get("type", "venv"))
                 exists = "yes" if env["exists"] else Colors.red("no") + " " * 6
                 kernel = "yes" if env["has_kernel"] else Colors.red("no") + " " * 6
                 # Use workspace-relative path except for conda global
-                if env.get("type") == "conda" and _is_conda_global(env['path']):
+                if env.get("type") == "conda" and is_conda_base_dir(env['path']):
                     display_path = env['path']
                 else:
                     display_path = _relative_path(env['path'], workspace)
@@ -728,7 +688,7 @@ def main():
                     exists_str = "yes" if env["exists"] else Colors.red("no") + " " * 6
                     kernel_str = "yes" if env["has_kernel"] else Colors.red("no") + " " * 6
                     # Use workspace-relative path except for conda global
-                    if env["type"] == "conda" and _is_conda_global(env["path"]):
+                    if env["type"] == "conda" and is_conda_base_dir(env["path"]):
                         display_path = env["path"]
                     else:
                         display_path = _relative_path(env["path"], workspace)
