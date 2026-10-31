@@ -201,4 +201,6 @@ jobs:
           python_version: '3.13'
       - uses: jupyterlab/maintainer-tools/.github/actions/check-links@v1
         with:
+          # The two trackers quote sample markup such as <img src=x>, which the checker reads as links of the file.
+          ignore_glob: "docs/defects.md docs/acc-crit.md"
           ignore_links: 'https://www.npmjs.com/package/.* https://pepy.tech/.* https://static.pepy.tech/.*'
