@@ -7,3 +7,4 @@ nb_venv_kernels
 .claude
 eslint.config.mjs
 .venv
+.agents

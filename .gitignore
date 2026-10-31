@@ -134,3 +134,8 @@ dmypy.json
 uv.lock
 jump.png
 issue.png
+
+# Run output
+logs/
+tmp/
+junit.xml
