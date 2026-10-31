@@ -1,7 +1,7 @@
 {
-  "name": "nb_venv_kernels-ui-tests",
+  "name": "@stellarshenson/nb-venv-kernels-ui-tests",
   "version": "1.0.0",
-  "description": "JupyterLab nb_venv_kernels Integration Tests",
+  "description": "JupyterLab @stellarshenson/nb-venv-kernels Integration Tests",
   "private": true,
   "scripts": {
     "start": "jupyter lab --config jupyter_server_test_config.py",

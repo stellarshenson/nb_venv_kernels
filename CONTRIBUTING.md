@@ -57,7 +57,7 @@ pip uninstall nb_venv_kernels
 
 In development mode, you will also need to remove the symlink created by `jupyter-builder develop`
 command. To find its location, you can run `jupyter labextension list` to figure out where the `labextensions`
-folder is located. Then you can remove the symlink named `nb_venv_kernels` within that folder.
+folder is located. Then you can remove the symlink named `@stellarshenson/nb-venv-kernels` within that folder.
 
 ## Endpoint authentication
 

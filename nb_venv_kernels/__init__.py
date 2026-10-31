@@ -15,7 +15,7 @@ from .routes import setup_route_handlers
 def _jupyter_labextension_paths():
     return [{
         "src": "labextension",
-        "dest": "nb_venv_kernels"
+        "dest": "@stellarshenson/nb-venv-kernels"
     }]
 
 

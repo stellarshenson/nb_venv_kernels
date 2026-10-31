@@ -1893,6 +1893,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@stellarshenson/nb-venv-kernels-ui-tests@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "@stellarshenson/nb-venv-kernels-ui-tests@workspace:."
+  dependencies:
+    "@jupyterlab/galata": ^5.6.0
+    "@playwright/test": ^1.64.0
+  languageName: unknown
+  linkType: soft
+
 "@types/d3-array@npm:*":
   version: 3.2.2
   resolution: "@types/d3-array@npm:3.2.2"
@@ -3333,15 +3342,6 @@ __metadata:
   checksum: e5061282c25412663f527abe382b3dc7165585f18b5edb7c6500a5f56d9570b1de8b26500c231ae5e28e299f20d3877f839268ed5c302f997b5627237a04dcf9
   languageName: node
   linkType: hard
-
-"nb_venv_kernels-ui-tests@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "nb_venv_kernels-ui-tests@workspace:."
-  dependencies:
-    "@jupyterlab/galata": ^5.6.0
-    "@playwright/test": ^1.64.0
-  languageName: unknown
-  linkType: soft
 
 "node-fetch@npm:^2.6.7":
   version: 2.7.0

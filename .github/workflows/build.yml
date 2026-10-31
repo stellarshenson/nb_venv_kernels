@@ -46,7 +46,7 @@ jobs:
           jupyter server extension list 2>&1 | grep -ie "nb_venv_kernels.*OK"
 
           jupyter labextension list
-          jupyter labextension list 2>&1 | grep -ie "nb_venv_kernels.*OK"
+          jupyter labextension list 2>&1 | grep -ie "@stellarshenson/nb-venv-kernels.*OK"
           python -m jupyterlab.browser_check
 
       - name: Run Python tests
@@ -104,30 +104,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-          architecture: 'x64'
-      - uses: actions/download-artifact@v4
-        with:
-          name: extension-artifacts
-      - name: Install and Test
-        run: |
-          set -eux
-          # Remove NodeJS, twice to take care of system and locally installed node versions.
-          sudo rm -rf $(which node)
-          sudo rm -rf $(which node)
+    - name: Install Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        architecture: 'x64'
+    - uses: actions/download-artifact@v4
+      with:
+        name: extension-artifacts
+    - name: Install and Test
+      run: |
+        set -eux
+        # Remove NodeJS, twice to take care of system and locally installed node versions.
+        sudo rm -rf $(which node)
+        sudo rm -rf $(which node)
 
-          pip install "jupyterlab>=4.6.0,<5" nb_venv_kernels*.whl
+        pip install "jupyterlab>=4.0.0,<5" nb_venv_kernels*.whl
 
 
-          jupyter server extension list
-          jupyter server extension list 2>&1 | grep -ie "nb_venv_kernels.*OK"
+        jupyter server extension list
+        jupyter server extension list 2>&1 | grep -ie "nb_venv_kernels.*OK"
 
-          jupyter labextension list
-          jupyter labextension list 2>&1 | grep -ie "nb_venv_kernels.*OK"
-          python -m jupyterlab.browser_check --no-browser-test
+        jupyter labextension list
+        jupyter labextension list 2>&1 | grep -ie "@stellarshenson/nb-venv-kernels.*OK"
+        python -m jupyterlab.browser_check --no-browser-test
 
   integration-tests:
     name: Integration tests

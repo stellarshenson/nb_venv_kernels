@@ -169,15 +169,17 @@ async function executeScanCommand(): Promise<void> {
 }
 
 /**
- * Initialization data for the nb_venv_kernels extension.
+ * Initialization data for the @stellarshenson/nb-venv-kernels extension.
  */
 const plugin: JupyterFrontEndPlugin<void> = {
-  id: 'nb_venv_kernels:plugin',
+  id: '@stellarshenson/nb-venv-kernels:plugin',
   description:
     'Discovers Jupyter kernels from conda, venv, and uv environments',
   autoStart: true,
   activate: (app: JupyterFrontEnd) => {
-    console.log('JupyterLab extension nb_venv_kernels is activated!');
+    console.log(
+      'JupyterLab extension @stellarshenson/nb-venv-kernels is activated!'
+    );
 
     // Capture kernel spec manager for refreshing after scan
     kernelSpecManager = app.serviceManager.kernelspecs;

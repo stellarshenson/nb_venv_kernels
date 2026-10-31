@@ -1,7 +1,7 @@
 # nb_venv_kernels
 
 [![GitHub Actions](https://github.com/stellarshenson/nb_venv_kernels/actions/workflows/build.yml/badge.svg)](https://github.com/stellarshenson/nb_venv_kernels/actions/workflows/build.yml)
-[![npm version](https://img.shields.io/npm/v/nb_venv_kernels.svg)](https://www.npmjs.com/package/nb_venv_kernels)
+[![npm version](https://img.shields.io/npm/v/@stellarshenson/nb-venv-kernels.svg)](https://www.npmjs.com/package/@stellarshenson/nb-venv-kernels)
 [![PyPI version](https://img.shields.io/pypi/v/nb_venv_kernels.svg)](https://pypi.org/project/nb_venv_kernels/)
 [![Total PyPI downloads](https://static.pepy.tech/badge/nb_venv_kernels)](https://pepy.tech/project/nb_venv_kernels)
 [![JupyterLab 4](https://img.shields.io/badge/JupyterLab-4-orange.svg)](https://jupyterlab.readthedocs.io/en/stable/)
