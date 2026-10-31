@@ -2,6 +2,17 @@
 
 <!-- <START NEW CHANGELOG ENTRY> -->
 
+## [1.2.49] - 2026-10-31
+
+### Changed
+
+- Exclude the two trackers from the link check
+- Upgrade to extension template v4.6.5 and Makefile 1.46
+
+### Fixed
+
+- Take the scoped @stellarshenson/nb-venv-kernels npm name
+
 ## 1.2.46
 
 ### Fixed
